@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Navbar from "@/components/ui/navbar";
 import supabase from "@/lib/helper";
 import AdminSidebar from "@/components/ui/AdminSidebar;";
+import QuickStoreLoading from "@/components/ui/QuickStoreLoading";
 
 export default function AdminLayout({ children }) {
   const [openSidebar, setOpenSidebar] = useState(true);
@@ -52,7 +53,7 @@ export default function AdminLayout({ children }) {
   }, []);
   
   if (loading) {
-    return <div className="p-8 text-center">Loading...</div>;
+    return <QuickStoreLoading message="Loading Dashboard Please wait...."/>
   }
 
   return (

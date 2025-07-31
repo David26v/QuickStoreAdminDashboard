@@ -17,10 +17,7 @@ const Navbar = ({ openSideBar ,user }) => {
 
 
 
- 
 
-
-  // Mock notifications - replace with actual notifications
   const notifications = [
     {
       id: 1,
@@ -62,7 +59,7 @@ const Navbar = ({ openSideBar ,user }) => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("username");
   
-    router.push("/");
+    router.push("/forms/login");
   };
 
   return (

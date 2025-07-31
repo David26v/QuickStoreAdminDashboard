@@ -80,8 +80,8 @@ const QuickStoreRegister = () => {
     return Object.keys(newErrors).length === 0;
   };
 
- const handleSubmit = async () => {
-  console.log('is it returning')
+ const handleSubmit = async (e) => {
+  e.preventDefault()
     show('Registering account...');
   
     if (!validateForm()) return;

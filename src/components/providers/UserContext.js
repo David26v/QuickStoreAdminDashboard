@@ -14,11 +14,8 @@ export const UserProvider = ({ children }) => {
     const fetchSupabaseUser = async () => {
       const { data, error } = await supabase.auth.getUser();
 
-      if (error || !data?.user) {
-        console.error("❌ No authenticated user found", error);
-        setLoading(false);
-        return;
-      }
+ 
+   
 
       const { id, user_metadata } = data.user;
 
@@ -31,7 +28,7 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   return (
-    <UserContext.Provider value={{ userId, user, loading }}>
+    <UserContext.Provider value={{ userId, user, loading  }}>
       {children}
     </UserContext.Provider>
   );

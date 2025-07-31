@@ -24,37 +24,28 @@ import {
   Tv,
   TvMinimalPlayIcon,
   Users2,
-  Megaphone, 
-  MessageCircle, 
-  Mail, 
+  Megaphone,
+  MessageCircle,
+  Mail,
   FileText as FileTextDoc,
-  BookOpen, 
-  Newspaper, 
-  Settings2, 
-  Timer, 
-  ListTodo, 
-  Plug, 
-  DatabaseBackup, 
-  Award, 
-  Target, 
-  UserPlus, 
-  NotebookPen, 
-  CalendarCheck2, 
-  ArrowRightToLine,
-  Receipt, 
-  WalletCards,
-  Scale, 
+  BookOpen,
+  Newspaper,
+  Settings2,
+  Plug,
+  DatabaseBackup,
   Calendar,
-  MonitorCogIcon, 
-  Lock, // Add Locker specific icon
-  MapPin, // For Location/Area
-  Wrench, // For Maintenance
-  Clock, // For Reservations/Timing
+  MonitorCogIcon,
+  Lock,
+  MapPin,
+  Wrench,
+  Clock,
+  LocateIcon,
+  Settings2Icon,
+  UserPlus,
 } from "lucide-react";
 import { useLoading } from "../providers/LoadingProvider";
 
-// --- Custom Logo for QuickStore Philippines ---
-// Matches the style and colors of the login page logo
+
 const QuickStoreLogo = ({ size = "w-16 h-16" }) => (
   <div className={`relative inline-flex items-center justify-center ${size} bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-lg overflow-hidden`}>
     <div className="absolute inset-2 bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl flex items-center justify-center shadow-inner">
@@ -65,7 +56,7 @@ const QuickStoreLogo = ({ size = "w-16 h-16" }) => (
     </div>
   </div>
 );
-// --- End QuickStore Logo ---
+
 
 const AdminSidebar = ({ isOpen, role }) => {
   const [activeItem, setActiveItem] = useState("Dashboard");
@@ -91,7 +82,7 @@ const AdminSidebar = ({ isOpen, role }) => {
   };
 
   // --- Updated Styles to match QuickStore theme ---
-  const activeStyle = "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg transform scale-105"; // Orange for active items
+  const activeStyle = "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg transform scale-105";
   const inactiveStyle = "text-gray-600 hover:text-gray-800";
   const groupStyle = "text-gray-700 hover:bg-gray-100";
   // --- End Updated Styles ---
@@ -99,85 +90,92 @@ const AdminSidebar = ({ isOpen, role }) => {
   // --- ADMIN SIDEBAR MENU (Updated for Locker System Context) ---
   const adminMenu = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", type: "single" },
-    
+
     // --- Core Locker Management ---
     {
       label: "Locker Management", icon: Lock, type: "group", children: [
-        { label: "Locker Inventory", icon: LayoutDashboard, path: "/admin/locker-management/inventory" }, // View all lockers
-        { label: "Assign Lockers", icon: UserCog, path: "/admin/locker-management/assign" }, // Assign to users/employees
-        { label: "Locker Groups/Zones", icon: MapPin, path: "/admin/locker-management/groups" }, // Group by location/department
-        { label: "Reservation System", icon: Clock, path: "/admin/locker-management/reservations" }, // If time-based booking is needed
+        { label: "Locker Inventory", icon: LayoutDashboard, path: "/admin/locker-management/inventory" },
+        { label: "Assign Lockers", icon: UserCog, path: "/admin/locker-management/assign" },
+        { label: "Locker Groups/Zones", icon: MapPin, path: "/admin/locker-management/groups" },
+        { label: "Reservation System", icon: Clock, path: "/admin/locker-management/reservations" },
+        { label: "Lockers Location ", icon: LocateIcon, path: "/admin/locker-management/location" },
+        { label: "Locker Session History", icon: FileClock, type: "single", path: "/admin/locker-history" },
+        { label: "Lockers Settings", icon: Settings2Icon, type: "single", path: "/admin/locker-history" },
       ]
     },
-    {
-      label: "Live Monitoring", icon: Tv, type: "group", children: [
-        { label: "Monitor", icon: TvMinimalPlayIcon, path: "/admin/live-monitoring/live-monitor" },
-        { label: "Monitoring Settings", icon: MonitorCogIcon, path: "/admin/live-monitoring/monitoring-settings" },
-      ]
-    },
-    // --- User Management (Essential for Locker Access) ---
+
     {
       label: "User Management", icon: Users, type: "group", children: [
-        { label: "Employees", icon: Briefcase, path: "/admin/user-management/employees" },
-        { label: "Users", icon: UserCog, path: "/admin/user-management/users" },
-        { label: "Roles", icon: User2, path: "/admin/user-management/roles" }, // Define access levels (e.g., Admin, Employee, Guest)
-        { label: "Department", icon: Building2, path: "/admin/user-management/department" }, // Useful for grouping locker assignments
-        { label: "Shift", icon: CalendarCog, path: "/admin/user-management/shift" }, // Could link to time-based access rules
+        { label: "Employees", icon: Users2, path: "/admin/user-management/employees" },
+        { label: "Guest", icon: Briefcase, path: "/admin/user-management/employees" },
+        { label: "Members", icon: Briefcase, path: "/admin/user-management/employees" },
       ]
-    }, 
+    },
+    {
+      label: "Client Management", icon: Building2, type: "group", children: [
+        {
+          label: "Client List",
+          icon: Users,
+          path: "/admin/clients"
+        },
+        {
+          label: "Add Client",
+          icon: UserPlus,
+          path: "/admin/clients/new"
+        }
+      ]
+    },
+
+
     // --- Access & Security ---
     {
       label: "Access Control", icon: Shield, type: "group", children: [
-        { label: "Access Logs", icon: CalendarDays, path: "/admin/access-control/logs" }, // Detailed locker access history
-        { label: "Access Rules", icon: Settings, path: "/admin/access-control/rules" }, // Define who can access what, when
-        { label: "Audit Trail", icon: Shield, path: "/admin/access-control/audit-trail" }, // System activity logs
+        { label: "Access Logs", icon: CalendarDays, path: "/admin/access-control/logs" },
+        { label: "Access Rules", icon: Settings, path: "/admin/access-control/rules" },
+        { label: "Audit Trail", icon: Shield, path: "/admin/access-control/audit-trail" },
       ]
     },
     // --- Maintenance ---
     {
       label: "Maintenance", icon: Wrench, type: "group", children: [
-        { label: "Maintenance Logs", icon: FileClock, path: "/admin/maintenance/logs" }, // Record service/repairs
-        { label: "Scheduled Maintenance", icon: Calendar, path: "/admin/maintenance/schedule" }, // Plan upkeep
-        { label: "Locker Status", icon: Activity, path: "/admin/maintenance/status" }, // View operational status of lockers
+        { label: "Maintenance Logs", icon: FileClock, path: "/admin/maintenance/logs" },
+        { label: "Scheduled Maintenance", icon: Calendar, path: "/admin/maintenance/schedule" },
+        { label: "Locker Status", icon: Activity, path: "/admin/maintenance/status" },
       ]
     },
     // --- Communication & Content (Could be used for notifications, manuals) ---
     {
       label: "Communication", icon: MessageCircle, type: "group", children: [
-        { label: "Announcements", icon: Megaphone, path: "/admin/communication/announcements" }, // Notify users about maintenance, issues
-        { label: "Messaging", icon: MessageCircle, path: "/admin/communication/messages" }, // Direct user communication
-        { label: "Email Templates", icon: Mail, path: "/admin/communication/email-templates" }, // For access codes, notifications
+        { label: "Announcements", icon: Megaphone, path: "/admin/communication/announcements" },
+        { label: "Messaging", icon: MessageCircle, path: "/admin/communication/messages" },
+        { label: "Email Templates", icon: Mail, path: "/admin/communication/email-templates" },
       ]
     },
     {
       label: "Content Library", icon: BookOpen, type: "group", children: [
-        { label: "User Guides", icon: FileTextDoc, path: "/admin/documents/user-guides" }, // How-tos for users
-        { label: "Knowledge Base", icon: BookOpen, path: "/admin/knowledge-base" }, // FAQs, troubleshooting
-        { label: "News/Blog", icon: Newspaper, path: "/admin/news" }, // Company updates, system news
+        { label: "User Guides", icon: FileTextDoc, path: "/admin/documents/user-guides" },
+        { label: "Knowledge Base", icon: BookOpen, path: "/admin/knowledge-base" },
+        { label: "News/Blog", icon: Newspaper, path: "/admin/news" },
       ]
     },
-    // --- Analytics & Reporting (Crucial for Locker System Management) ---
     {
       label: "Analytics & Reports", icon: TrendingUp, type: "group", children: [
-        { label: "Usage Reports", icon: BarChart, path: "/admin/analytics-report-management/usage-reports" }, // Locker utilization stats
-        { label: "Access Analytics", icon: TrendingUp, path: "/admin/analytics-report-management/access-analytics" }, // Peak times, frequent users
-        { label: "Financial Reports", icon: Wallet, path: "/admin/analytics-report-management/financial-reports" }, // If there are fees
-        // Audit Trail moved to Access Control for better context
+        { label: "Usage Reports", icon: BarChart, path: "/admin/analytics-report-management/usage-reports" },
+        { label: "Access Analytics", icon: TrendingUp, path: "/admin/analytics-report-management/access-analytics" },
+        { label: "Financial Reports", icon: Wallet, path: "/admin/analytics-report-management/financial-reports" },
       ]
     },
-    // --- System Settings ---
     {
       label: "System Settings", icon: Settings2, type: "group", children: [
         { label: "General Settings", icon: Settings, path: "/admin/system-settings/general" },
-        { label: "Integrations", icon: Plug, path: "/admin/system-settings/integrations" }, // E.g., with HR systems, payment gateways
+        { label: "Integrations", icon: Plug, path: "/admin/system-settings/integrations" },
         { label: "Backup & Restore", icon: DatabaseBackup, path: "/admin/system-settings/backup" },
       ]
     },
     { label: "Profile Settings", icon: Settings, path: "/admin/profile", type: "single" },
+
   ];
   // --- END UPDATED ADMIN SIDEBAR ---
-
-  // Only show the admin menu if the role is 'admin'
   const sidebarItems = role === "admin" ? adminMenu : [];
 
   const renderMenuItem = (item) => {
@@ -186,11 +184,10 @@ const AdminSidebar = ({ isOpen, role }) => {
         <div
           key={item.label}
           onClick={() => handleItemClick(item)}
-          className={`flex items-center space-x-3 h-12 px-4 rounded-xl cursor-pointer transition-all duration-200 ${
-            activeItem === item.label
+          className={`flex items-center space-x-3 h-12 px-4 rounded-xl cursor-pointer transition-all duration-200 ${activeItem === item.label
               ? activeStyle
               : `${inactiveStyle} hover:bg-gray-50 hover:shadow-sm`
-          }`}
+            }`}
         >
           <div className="flex items-center justify-center w-8">
             <item.icon className={`w-5 h-5 ${activeItem === item.label ? 'text-white' : 'text-gray-600'}`} />
@@ -229,11 +226,10 @@ const AdminSidebar = ({ isOpen, role }) => {
                 <div
                   key={child.label}
                   onClick={() => handleItemClick(child)}
-                  className={`flex items-center space-x-3 h-10 px-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                    activeItem === child.label
-                      ? "bg-orange-50 text-orange-600 border-l-2 border-orange-500" // Orange for active child items
+                  className={`flex items-center space-x-3 h-10 px-3 rounded-lg cursor-pointer transition-all duration-200 ${activeItem === child.label
+                      ? "bg-orange-50 text-orange-600 border-l-2 border-orange-500"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                  }`}
+                    }`}
                 >
                   <child.icon className="w-4 h-4" />
                   <span className="text-sm">{child.label}</span>
@@ -244,7 +240,7 @@ const AdminSidebar = ({ isOpen, role }) => {
         </div>
       );
     }
-    return null; 
+    return null;
   };
 
   return (
