@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation'; 
 import supabase from '@/lib/helper';
 import AddLockerModal from './components/AddLockerModal';
+import { useUser } from '@/components/providers/UserContext';
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
@@ -47,6 +48,7 @@ const LockerInventory = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState(null);
+  const {clientId} = useUser();
 
 
   useEffect(() => {
@@ -77,7 +79,8 @@ const LockerInventory = () => {
           email,
           phone
         )
-      `);
+      `)
+      .eq('client_id',clientId)
 
     if (lockersError) throw lockersError;
 
