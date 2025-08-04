@@ -8,6 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLoading } from "@/components/providers/LoadingProvider";
+import supabase from "@/lib/helper";
+import { useRouter } from 'next/navigation';
+
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -18,7 +21,9 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading,  setIsLoading] = useState(false);
+  const router = useRouter();
   const {show ,hide} = useLoading();
+  
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -26,7 +31,6 @@ const Login = () => {
       ...prev,
       [name]: value,
     }));
-    // Clear error when user types
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -47,80 +51,91 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
- const handleSubmit = async () => {
-    show("Logging in...");
-  
-    if (!validateForm()) return;
-  
-    try {
-      show("Authenticating...", "Verifying credentials");
-  
-      let emailToUse = formData.usernameOrEmail;
-  
-      // ✅ Handle username login
-      if (!formData.usernameOrEmail.includes("@")) {
-        const { data: profileLookup, error } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("username", formData.usernameOrEmail)
-          .single();
-  
-        if (error || !profileLookup?.email) {
-          show("Login Failed", "Invalid username or account not found.");
-          console.error("Username lookup error:", error);
-          return;
-        }
-  
-        emailToUse = profileLookup.email;
-      }
-  
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: formData.password,
-      });
-  
-  
-      if (error || !data?.session?.user) {
-        show("Login Failed", error?.message || "No session returned.");
-        return;
-      }
-  
-      const user = data.session.user;
-  
-      // ✅ Fetch profile role
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-  
-      if (profileError || !profile?.role) {
-        show("Login Failed", "User role not found.");
-        console.error("Profile fetch error:", profileError);
-        return;
-      }
-  
-      const role = profile.role;
-      console.log("Logged-in user role:", role);
-  
-      show("Success", "Logged in successfully!");
-  
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-      if (role === "admin") {
-        router.push("/admin/dashboard");
-      } else if (role === "employee") {
-        router.push("/employees/dashboard");
-      } else {
-        show("Login Failed", `Unknown role: ${role}`);
+  if (isLoading) return; 
+
+  setErrors({});
+  setIsLoading(true);
+  show("Logging in...");
+
+  if (!validateForm()) {
+    hide();
+    setIsLoading(false);
+    return;
+  }
+
+  try {
+    show("Authenticating...", "Verifying credentials");
+
+    let emailToUse = formData.usernameOrEmail;
+
+    // Handle username -> email lookup
+    if (!emailToUse.includes("@")) {
+      const { data: profileLookup, error } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("username", emailToUse)
+        .single();
+
+      if (error || !profileLookup?.email) {
+        setErrors({ general: "Invalid username or account not found." });
+        console.error("Username lookup error:", error);
+        return;
       }
-    } catch (err) {
-      console.error("Login error:", err);
-      show("Unexpected error", err.message || "Something went wrong.");
-    } 
-    finally {
-      hide();
+
+      emailToUse = profileLookup.email;
     }
-  };
+
+    // Sign in
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email: emailToUse,
+      password: formData.password,
+    });
+
+    if (loginError || !loginData?.session?.user) {
+      setErrors({ general: loginError?.message || "Login failed." });
+      return;
+    }
+
+    const user = loginData.session.user;
+
+    // Get role
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile?.role) {
+      setErrors({ general: "User role not found." });
+      console.error("Profile fetch error:", profileError);
+      return;
+    }
+
+    const role = profile.role;
+
+    show("Success", "Logged in successfully!");
+
+    // Redirect once
+    if (role === "admin") {
+      router.push("/admin/dashboard");
+    } else if (role === "employee") {
+      router.push("/employees/dashboard");
+    } else {
+      setErrors({ general: `Unknown role: ${role}` });
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    setErrors({ general: err.message || "Unexpected error occurred." });
+  } finally {
+    setIsLoading(false);
+    hide();
+  }
+};
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 flex items-center justify-center p-4 relative overflow-hidden">
