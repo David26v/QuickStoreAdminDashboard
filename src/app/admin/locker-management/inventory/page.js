@@ -1,4 +1,3 @@
-// app/admin/locker-management/inventory/page.jsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import {
@@ -12,140 +11,19 @@ import {
   CheckCircle,
   XCircle,
   Package,
-  Calendar,
-  Clock,
   Eye,
   Download,
-  Upload,
   RefreshCw,
   ChevronDown,
-  Edit3,
   Building2,
-  Wrench,
-  User,
-  DoorOpen,
-  DoorClosed,
-  Truck,
-  Home,
-  Archive,
-  HardHat // For Under Maintenance
+  AlertCircle,
+  Grid3X3 ,
+  Home ,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation'; 
+import supabase from '@/lib/helper';
+import AddLockerModal from './components/AddLockerModal';
 
-// --- Mock Data ---
-// Assuming this data structure reflects the JOINs you'd get from the database
-// e.g., SELECT l.*, c.name as client_name, d.manufacturer, d.model, d.android_version
-// FROM lockers l LEFT JOIN clients c ON l.client_id = c.id LEFT JOIN devices d ON l.device_id = d.id;
-const mockLockers = [
-  {
-    id: '1',
-    locker_number: 101,
-    status: 'received_by_client',
-    client_id: 'client-1',
-    device_id: 'device-1',
-    assigned_at: '2023-10-27T10:00:00Z',
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-27T10:00:00Z',
-    client_name: 'TechNova Solutions', // Derived from JOIN
-    device_manufacturer: 'Samsung',    // Derived from JOIN
-    device_model: 'Galaxy S22',       // Derived from JOIN
-    device_android_version: '13',     // Derived from JOIN
-    // Potentially add color here if it's a locker property
-    // locker_color: '#4ade80' // Example
-  },
-  {
-    id: '2',
-    locker_number: 102,
-    status: 'available',
-    client_id: null,
-    device_id: null,
-    assigned_at: null,
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-26T09:00:00Z',
-    client_name: null,
-    device_manufacturer: null,
-    device_model: null,
-    device_android_version: null,
-  },
-  {
-    id: '3',
-    locker_number: 103,
-    status: 'under_maintenance',
-    client_id: 'client-2',
-    device_id: null,
-    assigned_at: null,
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-27T10:00:00Z',
-    client_name: 'Global Logistics Inc.',
-    device_manufacturer: null,
-    device_model: null,
-    device_android_version: null,
-  },
-  {
-    id: '4',
-    locker_number: 104,
-    status: 'onsite',
-    client_id: 'client-1',
-    device_id: 'device-2',
-    assigned_at: '2023-10-28T10:00:00Z',
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-28T10:00:00Z',
-    client_name: 'TechNova Solutions',
-    device_manufacturer: 'Google',
-    device_model: 'Pixel 7',
-    device_android_version: '14',
-  },
-  {
-    id: '5',
-    locker_number: 105,
-    status: 'in_warehouse',
-    client_id: 'client-3',
-    device_id: null,
-    assigned_at: null,
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-26T09:00:00Z',
-    client_name: 'City Bank',
-    device_manufacturer: null,
-    device_model: null,
-    device_android_version: null,
-  },
-  {
-    id: '6',
-    locker_number: 106,
-    status: 'arriving_to_client',
-    client_id: 'client-2',
-    device_id: null,
-    assigned_at: null,
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-26T09:00:00Z',
-    client_name: 'Global Logistics Inc.',
-    device_manufacturer: null,
-    device_model: null,
-    device_android_version: null,
-  },
-  {
-    id: '7',
-    locker_number: 107,
-    status: 'no_device_yet',
-    client_id: 'client-1',
-    device_id: null,
-    assigned_at: null,
-    released_at: null,
-    created_at: '2023-10-26T09:00:00Z',
-    updated_at: '2023-10-26T09:00:00Z',
-    client_name: 'TechNova Solutions',
-    device_manufacturer: null,
-    device_model: null,
-    device_android_version: null,
-  },
-];
-
-// --- Status Options ---
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
   { value: 'under_maintenance', label: 'Under Maintenance' },
@@ -158,18 +36,104 @@ const statusOptions = [
 ];
 
 const LockerInventory = () => {
-  const [lockers, setLockers] = useState(mockLockers);
-  const [filteredLockers, setFilteredLockers] = useState(mockLockers);
+  const router = useRouter();
+
+  const [lockers, setLockers] = useState([]);
+  const [filteredLockers, setFilteredLockers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Get unique clients for filter dropdown
-  const uniqueClients = [...new Set(mockLockers.map(l => l.client_name).filter(Boolean))];
+
+  useEffect(() => {
+    fetchLockers();
+  }, []);
+  const fetchLockers = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+       const { data: lockersData, error: lockersError } = await supabase
+        .from('lockers')
+        .select(`
+          id,
+          locker_number,
+          status,
+          client_id,
+          assigned_to, 
+          assigned_at,
+          released_at,
+          created_at,
+          updated_at,
+          door_count,      
+          client:clients (
+            name,
+            location,
+            contact_person,
+            email,
+            phone
+          )
+        `);
+      // --- End Updated Query ---
+      if (lockersError) throw lockersError;
+      
+
+      const { data: devicesData, error: devicesError } = await supabase
+        .from('devices')
+        .select(`
+          id,
+          device_id,
+          manufacturer,
+          model,
+          android_version,
+          user_id
+        `);
+
+      if (devicesError) throw devicesError;
+
+
+     const formattedLockers = lockersData.map(locker => {
+        const device = devicesData.find(dev => dev.user_id === locker.assigned_to);
+        return {
+          id: locker.id,
+          locker_number: locker.locker_number,
+          status: locker.status,
+          client_id: locker.client_id,
+          assigned_at: locker.assigned_at,
+          released_at: locker.released_at,
+          created_at: locker.created_at,
+          updated_at: locker.updated_at,
+          door_count: locker.door_count,
+          client_name: locker.client?.name || null,
+          client_location: locker.client?.location || null,
+          contact_person: locker.client?.contact_person || null, 
+          email: locker.client?.email || null,
+          phone: locker.client?.phone || null,
+          device_id: device?.device_id || null,
+          device_manufacturer: device?.manufacturer || null,
+          device_model: device?.model || null,
+          device_android_version: device?.android_version || null,
+        };
+      });
+
+      setLockers(formattedLockers);
+      setFilteredLockers(formattedLockers);
+    } catch (error) {
+      console.error("Error fetching lockers:", error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     let result = lockers;
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -180,125 +144,197 @@ const LockerInventory = () => {
         (locker.client_name && locker.client_name.toLowerCase().includes(term))
       );
     }
+
     // Apply status filter
     if (statusFilter !== 'all') {
       result = result.filter(locker => locker.status === statusFilter);
     }
+
     // Apply client filter
     if (clientFilter !== 'all') {
       result = result.filter(locker => locker.client_name === clientFilter);
     }
+
     setFilteredLockers(result);
   }, [searchTerm, statusFilter, clientFilter, lockers]);
 
-  // --- Status Helper Functions ---
+
+  const statusOptions = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'under_maintenance', label: 'Under Maintenance' },
+    { value: 'no_device_yet', label: 'No Device Yet' },
+    { value: 'available', label: 'Available' },
+    { value: 'onsite', label: 'Onsite' },
+    { value: 'in_warehouse', label: 'In Warehouse' },
+    { value: 'arriving_to_client', label: 'Arriving to Client' },
+    { value: 'received_by_client', label: 'Received by Client' },
+  ];
+
+  const getStatusText = (status) => {
+    const option = statusOptions.find(opt => opt.value === status) || statusOptions.find(opt => opt.value === 'all');
+    return option ? option.label : status;
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available': return 'bg-green-100 text-green-800 border-green-200';
-      case 'received_by_client': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'under_maintenance': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'onsite': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'in_warehouse': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'arriving_to_client': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'no_device_yet': return 'bg-purple-100 text-purple-800 border-purple-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'available': return 'text-green-600 bg-green-100';
+      case 'no_device_yet': return 'text-purple-600 bg-purple-100';
+      case 'under_maintenance': return 'text-yellow-600 bg-yellow-100';
+      case 'onsite': return 'text-indigo-600 bg-indigo-100';
+      case 'in_warehouse': return 'text-gray-600 bg-gray-100';
+      case 'arriving_to_client': return 'text-orange-600 bg-orange-100';
+      case 'received_by_client': return 'text-blue-600 bg-blue-100';
+      default: return 'text-gray-600 bg-gray-100';
     }
   };
+
   const getStatusBgColor = (status) => {
     switch (status) {
       case 'available': return 'bg-green-50';
-      case 'received_by_client': return 'bg-blue-50';
+      case 'no_device_yet': return 'bg-purple-50';
       case 'under_maintenance': return 'bg-yellow-50';
       case 'onsite': return 'bg-indigo-50';
       case 'in_warehouse': return 'bg-gray-50';
       case 'arriving_to_client': return 'bg-orange-50';
-      case 'no_device_yet': return 'bg-purple-50';
+      case 'received_by_client': return 'bg-blue-50';
       default: return 'bg-gray-50';
     }
   };
+
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'available': return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'received_by_client': return <Package className="w-5 h-5 text-blue-600" />;
-      case 'under_maintenance': return <HardHat className="w-5 h-5 text-yellow-600" />;
-      case 'onsite': return <Home className="w-5 h-5 text-indigo-600" />;
-      case 'in_warehouse': return <Archive className="w-5 h-5 text-gray-600" />;
-      case 'arriving_to_client': return <Truck className="w-5 h-5 text-orange-600" />;
-      case 'no_device_yet': return <XCircle className="w-5 h-5 text-purple-600" />;
-      default: return <XCircle className="w-5 h-5 text-gray-600" />;
-    }
+    const option = statusOptions.find(opt => opt.value === status);
+    return option ? option.icon : <Package className="w-5 h-5 text-gray-600" />;
   };
-  const getStatusText = (status) => {
+
+  const getStatusLightColor = (status) => {
     switch (status) {
-      case 'available': return 'Available';
-      case 'received_by_client': return 'Received by Client';
-      case 'under_maintenance': return 'Under Maintenance';
-      case 'onsite': return 'Onsite';
-      case 'in_warehouse': return 'In Warehouse';
-      case 'arriving_to_client': return 'Arriving to Client';
-      case 'no_device_yet': return 'No Device Yet';
-      default: return status;
+      case 'available': return 'bg-green-500 shadow-[0_0_8px_2px_rgba(72,187,120,0.5)]';
+      case 'no_device_yet':
+      case 'received_by_client': return 'bg-blue-500 shadow-[0_0_8px_2px_rgba(59,130,246,0.5)]';
+      case 'under_maintenance': return 'bg-yellow-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]';
+      case 'onsite': return 'bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.5)]';
+      case 'in_warehouse': return 'bg-gray-500 shadow-[0_0_8px_2px_rgba(107,114,128,0.5)]';
+      case 'arriving_to_client': return 'bg-orange-500 shadow-[0_0_8px_2px_rgba(249,115,22,0.5)]';
+      default: return 'bg-gray-400';
     }
   };
 
-  // Determine icon and text for the locker door visualization
   const getDoorVisual = (status) => {
     switch (status) {
       case 'available':
-        return { icon: <DoorOpen className="w-10 h-10 text-green-400" />, text: 'OPEN' };
-      case 'received_by_client':
-        return { icon: <Package className="w-10 h-10 text-blue-400" />, text: 'IN USE' };
-      case 'under_maintenance':
-        return { icon: <Wrench className="w-10 h-10 text-yellow-400" />, text: 'REPAIR' };
-      case 'onsite':
-        return { icon: <Home className="w-10 h-10 text-indigo-400" />, text: 'ONSITE' };
-      case 'in_warehouse':
-        return { icon: <Archive className="w-10 h-10 text-gray-400" />, text: 'STOCK' };
-      case 'arriving_to_client':
-        return { icon: <Truck className="w-10 h-10 text-orange-400" />, text: 'TRANSIT' };
+        return { icon: <CheckCircle className="w-8 h-8 text-green-500" />, text: 'Ready' };
       case 'no_device_yet':
-        return { icon: <XCircle className="w-10 h-10 text-purple-400" />, text: 'EMPTY' };
+        return { icon: <XCircle className="w-8 h-8 text-purple-500" />, text: 'No Device' };
+      case 'under_maintenance':
+        return { icon: <Wrench className="w-8 h-8 text-yellow-500" />, text: 'Maintenance' };
+      case 'onsite':
+        return { icon: <Home className="w-8 h-8 text-indigo-500" />, text: 'Onsite' };
+      case 'in_warehouse':
+        return { icon: <Archive className="w-8 h-8 text-gray-500" />, text: 'Warehouse' };
+      case 'arriving_to_client':
+        return { icon: <Truck className="w-8 h-8 text-orange-500" />, text: 'In Transit' };
+      case 'received_by_client':
+        return { icon: <CheckCircle className="w-8 h-8 text-blue-500" />, text: 'Received' };
       default:
-        return { icon: <XCircle className="w-10 h-10 text-gray-400" />, text: 'UNKNOWN' };
+        return { icon: <Package className="w-8 h-8 text-gray-600" />, text: 'Unknown' };
     }
   };
 
-  // Determine status light color
-  const getStatusLightColor = (status) => {
-    switch (status) {
-      case 'available': return 'bg-green-500 animate-pulse';
-      case 'received_by_client': return 'bg-blue-500';
-      case 'under_maintenance': return 'bg-yellow-500';
-      case 'onsite': return 'bg-indigo-500';
-      case 'in_warehouse': return 'bg-gray-500';
-      case 'arriving_to_client': return 'bg-orange-500';
-      case 'no_device_yet': return 'bg-purple-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  // Determine if locker is ready for dispatch based on status
   const isReadyForDispatch = (status) => {
-    return status === 'available' || status === 'no_device_yet';
+    return status === 'available' || status === 'no_device_yet' || status === 'in_warehouse';
   };
+// --- End Helper Functions ---
 
-  const handleAssignDevice = (lockerId) => {
+
+
+  const handleAssignDevice = async (lockerId) => {
     console.log(`Assign device to locker ${lockerId}`);
-    // Implement device assignment logic here
+
+    alert(`Assign device flow for locker ${lockerId} - To be implemented`);
+    // Example: router.push(`/admin/locker-management/assign/${lockerId}`);
   };
 
-  const handleUnassignDevice = (lockerId) => {
+  const handleUnassignDevice = async (lockerId) => {
     console.log(`Unassign device from locker ${lockerId}`);
-    // Implement device unassignment logic here
+    try {
+      const { error } = await supabase
+        .from('lockers') // Or 'locker_doors' if that's where device_id is
+        .update({
+          device_id: null, // Or set appropriate status
+          status: 'available' // Or 'no_device_yet' depending on logic
+        })
+        .eq('id', lockerId);
+
+      if (error) throw error;
+
+      console.log("Device unassigned successfully");
+      // Refresh the list
+      fetchLockers();
+    } catch (error) {
+      console.error("Error unassigning device:", error);
+      alert("Failed to unassign device.");
+    }
   };
 
   const handleViewDetails = (lockerId) => {
     console.log(`View details for locker ${lockerId}`);
-    // Implement view details logic here
+    alert(`View details for locker ${lockerId} - To be implemented`);
+    // Example: router.push(`/admin/locker-management/details/${lockerId}`);
   };
+
+  const handleAddLockerModalOpen = () => {
+    setShowModal(true);
+  }
+
+  const HandleAddCLose = () => {
+    setShowModal(false)
+  }
+
+  const handleRefresh = () => {
+    fetchLockers();
+  };
+
+  // --- Render ---
+  if (loading) {
+    return (
+      <div className="p-6 min-h-screen flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
+        <span className="ml-2 text-gray-700">Loading lockers...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 min-h-screen flex flex-col items-center justify-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Data</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button
+          onClick={handleRefresh}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Derive unique clients from the fetched data
+  const uniqueClients = [...new Set(lockers.map(l => l.client_name).filter(Boolean))];
 
   return (
     <div className="p-6 min-h-screen">
+
+
+      {/* Modal */}
+      <AddLockerModal
+        isOpen={showModal}
+        onClose={HandleAddCLose}
+        onLockerAdded={fetchLockers}
+      />
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Locker Inventory</h1>
@@ -364,15 +400,24 @@ const LockerInventory = () => {
               )}
             </div>
             {/* Action Buttons */}
-            <button className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+            <button
+              onClick={handleAddLockerModalOpen} 
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Add Locker</span>
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => alert('Export functionality - To be implemented')}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
               <Download className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">Export</span>
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
               <RefreshCw className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">Refresh</span>
             </button>
@@ -380,7 +425,7 @@ const LockerInventory = () => {
         </div>
       </div>
       {/* Locker Card Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredLockers.length > 0 ? (
           filteredLockers.map((locker) => {
             const doorVisual = getDoorVisual(locker.status);
@@ -421,7 +466,6 @@ const LockerInventory = () => {
                     </button>
                   </div>
                 </div>
-
                 {/* Locker Body - Visual Representation */}
                 <div className="px-5 pb-4">
                   <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl h-40 flex items-center justify-center shadow-inner">
@@ -444,7 +488,6 @@ const LockerInventory = () => {
                     </div>
                   </div>
                 </div>
-
                 {/* Locker Footer - Information */}
                 <div className="px-5 py-4 bg-white bg-opacity-70 border-t border-gray-200">
                   {/* Client Info */}
@@ -457,6 +500,18 @@ const LockerInventory = () => {
                       {locker.client_name ? locker.client_name : <span className="italic text-gray-500">None Assigned</span>}
                     </p>
                   </div>
+                  
+                  {/* --- New Door Count Info --- */}
+                  <div className="mb-3">
+                    <div className="flex items-center text-sm text-gray-600 mb-1">
+                      <Grid3X3 className="w-4 h-4 mr-2 flex-shrink-0" />
+                      <span className="font-medium">Doors:</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {locker.door_count || 'N/A'}
+                    </p>
+                  </div>
+                  {/* --- End Door Count Info --- */}
 
                   {/* Device Info */}
                   <div className="mb-4">
@@ -477,12 +532,10 @@ const LockerInventory = () => {
                       )}
                     </p>
                   </div>
-
                   {/* Dispatch Status */}
                   <div className="mb-4">
                     <div className="flex items-center text-sm text-gray-600 mb-1">
-                       {/* Use a simple icon based on readiness */}
-                       {readyForDispatch ? (
+                      {readyForDispatch ? (
                         <CheckCircle className="w-4 h-4 mr-2 text-green-500 flex-shrink-0" />
                       ) : (
                         <XCircle className="w-4 h-4 mr-2 text-red-500 flex-shrink-0" />
@@ -493,10 +546,9 @@ const LockerInventory = () => {
                       {readyForDispatch ? 'Yes' : 'No'}
                     </p>
                   </div>
-
                   {/* Action Buttons */}
                   <div className="flex gap-2">
-                    {locker.device_id ? ( // Use device_id to check if device is assigned
+                    {locker.device_id ? (
                       <button
                         onClick={() => handleUnassignDevice(locker.id)}
                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -507,12 +559,11 @@ const LockerInventory = () => {
                     ) : (
                       <button
                         onClick={() => handleAssignDevice(locker.id)}
-                        disabled={!readyForDispatch} // Disable if not ready
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          readyForDispatch
+                        disabled={!readyForDispatch}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${readyForDispatch
                             ? 'bg-orange-500 text-white hover:bg-orange-600'
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
+                          }`}
                       >
                         <LinkIcon className="w-4 h-4" />
                         Assign

@@ -4,25 +4,18 @@ import React, { useState, useEffect } from 'react';
 import {
   Search,
   Filter,
-  MoreHorizontal,
   CheckCircle,
   XCircle,
-  Package, // For Occupied
-  RefreshCw,
+  Package,
   ChevronDown,
-  Wrench, // For Maintenance (if needed as a filter)
   ArrowLeft,
   Zap,
-  DoorOpen, // Potentially for Available
-  DoorClosed, // Potentially for Occupied
-  Clock // For Overdue
+  DoorOpen,
+  DoorClosed,
+  Clock
 } from 'lucide-react';
 
-// --- Import or Define mockLockers (Ensure it matches your data structure) ---
-// Option 1: Import from LockerInventory if exported
-// import { mockLockers } from '../inventory/page';
 
-// Option 2: Define directly or import from a shared mock file
 const mockLockers = [
   {
     id: '1',
@@ -51,19 +44,15 @@ const mockLockers = [
     devices: { id: 'device-3', device_id: 'CTRL_ABCD1', manufacturer: 'SecureLock', model: 'SL-500', android_version: '13' },
     clients: { id: 'client-2', name: 'Global Logistics Inc.' }
   },
-  // Add more lockers as needed
 ];
 
-// --- Door Status Definitions ---
 const DOOR_STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'available', label: 'Available' },
   { value: 'occupied', label: 'Occupied' },
   { value: 'overdue', label: 'Overdue' },
-  // { value: 'under_maintenance', label: 'Under Maintenance' } // Optional: if individual doors can be maintained
 ];
 
-// --- Door Status Helper Functions ---
 const getDoorStatusConfig = (status) => {
   switch (status) {
     case 'available':
@@ -75,7 +64,7 @@ const getDoorStatusConfig = (status) => {
     case 'occupied':
       return {
         colorClasses: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: <Package className="w-5 h-5 text-blue-600" />, // Using Package for Occupied
+        icon: <Package className="w-5 h-5 text-blue-600" />,
         text: 'Occupied'
       };
     case 'overdue':
@@ -84,12 +73,6 @@ const getDoorStatusConfig = (status) => {
         icon: <Clock className="w-5 h-5 text-red-600" />,
         text: 'Overdue'
       };
-    // case 'under_maintenance': // Optional
-    //   return {
-    //     colorClasses: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    //     icon: <Wrench className="w-5 h-5 text-yellow-600" />,
-    //     text: 'Maintenance'
-    //   };
     default:
       return {
         colorClasses: 'bg-gray-100 text-gray-800 border-gray-200',
@@ -104,25 +87,22 @@ const getDoorVisual = (status) => {
     case 'available':
       return <DoorOpen className="w-8 h-8 text-green-500" />;
     case 'occupied':
-      return <DoorClosed className="w-8 h-8 text-blue-500" />; // Or Package
+      return <DoorClosed className="w-8 h-8 text-blue-500" />;
     case 'overdue':
       return <Clock className="w-8 h-8 text-red-500" />;
-    // case 'under_maintenance': // Optional
-    //   return <Wrench className="w-8 h-8 text-yellow-500" />;
     default:
       return <XCircle className="w-8 h-8 text-gray-500" />;
   }
 };
 
-// --- Mock Dynamic Door Data ---
-// In a real app, this would be fetched based on the selected locker's ID
-// e.g., fetch(`/api/locker-doors?lockerId=${selectedLockerId}`)
 const generateMockDoors = (lockerId, numDoors, voltage) => {
-  // Simple mock data generation logic
-  const statuses = ['available', 'occupied', 'overdue']; // , 'under_maintenance'
+
+  const statuses = ['available', 'occupied', 'overdue'];
+
   return Array.from({ length: numDoors }, (_, i) => {
+
     const doorNumber = i + 1;
-    // Assign a status, making some overdue/occupied for demo
+
     let status;
     if (doorNumber % 7 === 0) {
       status = 'overdue';
@@ -131,24 +111,21 @@ const generateMockDoors = (lockerId, numDoors, voltage) => {
     } else {
       status = 'available';
     }
-    // if (doorNumber === 5) status = 'under_maintenance'; // Example maintenance
 
     return {
-      id: `d${lockerId.split('-').pop()}-${doorNumber}`, // e.g., d1-1, d1-2
+      id: `d${lockerId.split('-').pop()}-${doorNumber}`,
       locker_id: lockerId,
       door_number: doorNumber,
       status: status,
       voltage: voltage,
-      // client_id, assigned_user_id, etc. could be added based on status
     };
   });
 };
 
 const mockDoorsByLockerId = {
-  '1': generateMockDoors('1', 24, '24V'), // Locker 101: 24 doors, 24V
-  '2': generateMockDoors('2', 12, '12V'), // Locker 102: 12 doors, 12V
-  '3': generateMockDoors('3', 18, '24V'), // Locker 103: 18 doors, 24V
-  // Add entries for other lockers as needed
+  '1': generateMockDoors('1', 24, '24V'),
+  '2': generateMockDoors('2', 12, '12V'),
+  '3': generateMockDoors('3', 18, '24V'),
 };
 
 const LockerDoorsManagement = () => {
@@ -160,27 +137,26 @@ const LockerDoorsManagement = () => {
   const [doorSearchTerm, setDoorSearchTerm] = useState('');
   const [doorStatusFilter, setDoorStatusFilter] = useState('all');
   const [isDoorFilterOpen, setIsDoorFilterOpen] = useState(false);
-  const [selectedDoors, setSelectedDoors] = useState([]); // For potential bulk actions
+  const [selectedDoors, setSelectedDoors] = useState([]);
 
-  // --- Fetch Doors when Locker is Selected ---
   useEffect(() => {
+    
     if (selectedLocker) {
-      // In a real app, fetch doors based on selectedLocker.id
-      // e.g., fetch(`/api/locker-doors?lockerId=${selectedLocker.id}`)
       const doorsForSelectedLocker = mockDoorsByLockerId[selectedLocker.id] || [];
       setLockerDoors(doorsForSelectedLocker);
       setFilteredDoors(doorsForSelectedLocker);
       setDoorSearchTerm('');
       setDoorStatusFilter('all');
       setSelectedDoors([]);
-    } else {
+    }
+    else {
       setLockerDoors([]);
       setFilteredDoors([]);
       setSelectedDoors([]);
     }
   }, [selectedLocker]);
 
-  // --- Apply Filters to Doors ---
+
   useEffect(() => {
     let result = lockerDoors;
     if (doorSearchTerm) {
@@ -197,7 +173,6 @@ const LockerDoorsManagement = () => {
     setFilteredDoors(result);
   }, [doorSearchTerm, doorStatusFilter, lockerDoors]);
 
-  // --- Handler Functions ---
   const handleSelectLocker = (locker) => {
     setSelectedLocker(locker);
   };
@@ -207,7 +182,7 @@ const LockerDoorsManagement = () => {
   };
 
   const handleDoorSelect = (doorId) => {
-    // Example: Toggle selection for bulk actions (currently just visual)
+
     setSelectedDoors(prev =>
       prev.includes(doorId)
         ? prev.filter(id => id !== doorId)
@@ -215,17 +190,17 @@ const LockerDoorsManagement = () => {
     );
   };
 
-  // Placeholder for potential actions
+
   const handleBulkAction = (actionType) => {
     console.log(`Performing ${actionType} on doors:`, selectedDoors);
     alert(`Bulk action '${actionType}' triggered for ${selectedDoors.length} doors.`);
   };
 
-  // --- Render ---
+
   return (
     <div className="p-6 min-h-screen bg-gray-50">
       {!selectedLocker ? (
-        // --- Step 1: Locker Selection View ---
+
         <>
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Manage Locker Doors</h1>

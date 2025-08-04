@@ -19,7 +19,7 @@ import supabase from "@/lib/helper";
 import { FormModal } from '@/components/ui/ModalQuickStore';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox'; 
+import { Checkbox } from '@/components/ui/checkbox';
 
 const AddClientModal = ({
   isOpen,
@@ -27,9 +27,7 @@ const AddClientModal = ({
   onClientAdded,
   editClient = null
 }) => {
-  // --- Move isEditMode definition to the very top ---
   const isEditMode = Boolean(editClient);
-
   const [formData, setFormData] = useState({
     name: editClient?.name || '',
     location: editClient?.location || '',
@@ -37,59 +35,91 @@ const AddClientModal = ({
     email: editClient?.email || '',
     phone: editClient?.phone || '',
     notes: editClient?.notes || '',
-    // Remove auth_method from formData
   });
 
-  const [clientSettingsId, setClientSettingsId] = useState(null);
+  const [clientSettingsId, setClientSettingsId] = useState(null); // ID of the settings record
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [availableLockers, setAvailableLockers] = useState([]);
   const [assignedLockerIds, setAssignedLockerIds] = useState([]);
   const [initialAssignedLockerIds, setInitialAssignedLockerIds] = useState([]);
-  // State for multiple selected auth methods
-  const [selectedAuthMethods, setSelectedAuthMethods] = useState([]);
 
-  // --- Fetch available lockers and existing client settings (if editing) ---
+  // --- Updated State for Auth Methods ---
+  const [availableAuthMethods, setAvailableAuthMethods] = useState([]); // Fetched from auth_methods table
+  const [selectedAuthMethodIds, setSelectedAuthMethodIds] = useState([]); // Stores IDs from auth_methods
+  const [initialSelectedAuthMethodIds, setInitialSelectedAuthMethodIds] = useState([]); // For tracking changes on edit
+
+  // --- Fetch Available Auth Methods and Client Data ---
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
       if (isOpen) {
         setLoading(true);
-        setErrors({}); // Clear errors on new fetch attempt
+        setErrors({});
         try {
-          // 1. Fetch available lockers
+          // 1. Fetch available authentication methods
+          const { data: authMethodsData, error: authMethodsError } = await supabase
+            .from('auth_methods')
+            .select('id, name, technical_name') // Fetch id and name for display/selection
+            .eq('is_active', true); // Only fetch active methods
+          if (authMethodsError) throw authMethodsError;
+          if (isMounted) {
+            setAvailableAuthMethods(authMethodsData || []);
+          }
+
+          // 2. Fetch available lockers
           const { data: lockersData, error: lockersError } = await supabase
             .from('lockers')
             .select('id, locker_number, client_id');
-
           if (lockersError) throw lockersError;
           if (isMounted) {
             setAvailableLockers(lockersData || []);
           }
 
-          // 2. If editing, fetch existing client settings and assigned lockers
           if (isEditMode && editClient?.id) {
-            // --- Fetch Client Settings ---
+            // --- Fetch Client Settings ID ---
             const { data: settingsData, error: settingsError } = await supabase
               .from('client_locker_settings')
-              .select('*')
+              .select('id') // Only need the ID now
               .eq('client_id', editClient.id)
               .single();
-
             if (settingsError && settingsError.code !== 'PGRST116') {
               throw settingsError;
             }
             if (settingsData && isMounted) {
-              // Parse stored comma-separated string back to array
-              const parsedMethods = settingsData.auth_method
-                ? settingsData.auth_method.split(',').map(method => method.trim()).filter(Boolean)
-                : [];
-              setSelectedAuthMethods(parsedMethods);
               setClientSettingsId(settingsData.id);
             }
 
-            // --- Determine initially assigned lockers ---
-            // Lockers assigned to this specific client
+            // --- Fetch Assigned Auth Method IDs ---
+            // Requires clientSettingsId to be fetched first, or fetch settings ID again here
+            let settingsIdForAuth = null;
+            if (settingsData) {
+                settingsIdForAuth = settingsData.id;
+            } else {
+                // If no settings record exists yet, there are no auth methods assigned
+                if (isMounted) {
+                    setSelectedAuthMethodIds([]);
+                    setInitialSelectedAuthMethodIds([]);
+                }
+            }
+
+            if (settingsIdForAuth) {
+                const { data: clientAuthMethodsData, error: clientAuthMethodsError } = await supabase
+                .from('client_auth_methods')
+                .select('auth_method_id')
+                .eq('client_setting_id', settingsIdForAuth);
+
+                if (clientAuthMethodsError) throw clientAuthMethodsError;
+
+                const assignedMethodIds = clientAuthMethodsData?.map(item => item.auth_method_id) || [];
+                if (isMounted) {
+                    setSelectedAuthMethodIds(assignedMethodIds);
+                    setInitialSelectedAuthMethodIds(assignedMethodIds);
+                }
+            }
+
+
+            // --- Fetch Initially Assigned Lockers ---
             const initiallyAssigned = lockersData
               ?.filter(l => l.client_id === editClient.id)
               .map(l => l.id) || [];
@@ -98,13 +128,14 @@ const AddClientModal = ({
               setInitialAssignedLockerIds(initiallyAssigned);
             }
           } else {
-              // For new client, ensure these are reset
-              if (isMounted) {
-                setAssignedLockerIds([]);
-                setInitialAssignedLockerIds([]);
-                setSelectedAuthMethods([]);
-                setClientSettingsId(null);
-              }
+            // --- Reset for Add Mode ---
+            if (isMounted) {
+              setAssignedLockerIds([]);
+              setInitialAssignedLockerIds([]);
+              setSelectedAuthMethodIds([]); // Reset selected auth method IDs
+              setInitialSelectedAuthMethodIds([]);
+              setClientSettingsId(null);
+            }
           }
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -118,9 +149,7 @@ const AddClientModal = ({
         }
       }
     };
-
     fetchData();
-
     return () => { isMounted = false; };
   }, [isOpen, isEditMode, editClient?.id]);
 
@@ -139,10 +168,10 @@ const AddClientModal = ({
     if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number';
     }
-    // Optionally require at least one auth method
-    // if (selectedAuthMethods.length === 0) {
-    //   newErrors.auth_methods = 'At least one authentication method is required.';
-    // }
+    // --- Updated Validation for Auth Methods ---
+    if (selectedAuthMethodIds.length === 0) {
+      newErrors.auth_methods = 'At least one authentication method is required.';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -154,30 +183,27 @@ const AddClientModal = ({
       ...prev,
       [name]: value
     }));
+    // Clear specific field error if it existed
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
-  // --- Handler for toggling auth method selection ---
-  const handleAuthMethodToggle = (methodValue) => {
-    setSelectedAuthMethods(prevSelected => {
-      if (prevSelected.includes(methodValue)) {
-        return prevSelected.filter(m => m !== methodValue);
+  
+  const handleAuthMethodToggle = (methodId) => {
+    setSelectedAuthMethodIds(prevSelected => {
+      if (prevSelected.includes(methodId)) {
+        return prevSelected.filter(id => id !== methodId);
       } else {
-        return [...prevSelected, methodValue];
+        return [...prevSelected, methodId];
       }
     });
-    // Clear specific auth error if it existed
+  
     if (errors.auth_methods) {
        setErrors(prev => ({ ...prev, auth_methods: '' }));
     }
   };
 
-  // Handle locker checkbox change
   const handleLockerToggle = (lockerId) => {
     setAssignedLockerIds(prev => {
       if (prev.includes(lockerId)) {
@@ -188,7 +214,6 @@ const AddClientModal = ({
     });
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -198,6 +223,7 @@ const AddClientModal = ({
     try {
       let clientData;
       let clientId;
+      let settingsIdToUse = clientSettingsId; 
 
       // --- 1. Insert/Update Client ---
       if (isEditMode) {
@@ -215,7 +241,6 @@ const AddClientModal = ({
           .eq('id', editClient.id)
           .select()
           .single();
-
         if (clientError) throw clientError;
         clientData = data;
         clientId = data.id;
@@ -232,66 +257,74 @@ const AddClientModal = ({
           }])
           .select()
           .single();
-
         if (clientError) throw clientError;
         clientData = data;
         clientId = data.id;
       }
 
-      // --- 2. Insert/Update Client Locker Settings ---
-      // Prepare settings data, formatting selected methods for storage
-      const formattedAuthMethods = selectedAuthMethods.join(','); // e.g., 'password,face,card_reader'
+     
+      const { data: upsertedSettingsData, error: upsertSettingsError } = await supabase
+        .from('client_locker_settings')
+        .upsert({ client_id: clientId }, { onConflict: 'client_id' }) 
+        .select('id') 
+        .single();
 
-      const settingsData = {
-        client_id: clientId,
-        auth_method: formattedAuthMethods || null // Store null if none selected
-      };
+      if (upsertSettingsError) throw upsertSettingsError;
+      settingsIdToUse = upsertedSettingsData.id; 
 
-      let settingsResult;
-      if (isEditMode && clientSettingsId) {
-        // Update existing settings
-        settingsResult = await supabase
-          .from('client_locker_settings')
-          .update(settingsData)
-          .eq('id', clientSettingsId);
-      } else {
-        // Insert new settings (upsert handles creation)
-        settingsResult = await supabase
-          .from('client_locker_settings')
-          .upsert(settingsData, { onConflict: 'client_id' });
+     
+      const methodsToAdd = selectedAuthMethodIds.filter(id => !initialSelectedAuthMethodIds.includes(id));
+      const methodsToRemove = initialSelectedAuthMethodIds.filter(id => !selectedAuthMethodIds.includes(id));
+
+      if (methodsToAdd.length > 0) {
+        const recordsToAdd = methodsToAdd.map(methodId => ({
+          client_setting_id: settingsIdToUse,
+          auth_method_id: methodId
+        }));
+        const { error: insertAuthError } = await supabase
+          .from('client_auth_methods')
+          .insert(recordsToAdd);
+        if (insertAuthError) throw insertAuthError;
       }
 
-      const { error: settingsError } = settingsResult;
-      if (settingsError) throw settingsError;
+      if (methodsToRemove.length > 0) {
+        const { data: recordsToDelete, error: fetchDeleteError } = await supabase
+          .from('client_auth_methods')
+          .select('id')
+          .eq('client_setting_id', settingsIdToUse)
+          .in('auth_method_id', methodsToRemove);
 
-      // --- 3. Assign/Update Lockers ---
-      // Determine lockers to assign and unassign
+        if (fetchDeleteError) throw fetchDeleteError;
+
+        const recordIdsToDelete = recordsToDelete?.map(record => record.id) || [];
+        if (recordIdsToDelete.length > 0) {
+            const { error: deleteAuthError } = await supabase
+              .from('client_auth_methods')
+              .delete()
+              .in('id', recordIdsToDelete); 
+             if (deleteAuthError) throw deleteAuthError;
+        }
+      }
+
       const lockersToAssign = assignedLockerIds.filter(id => !initialAssignedLockerIds.includes(id));
       const lockersToUnassign = initialAssignedLockerIds.filter(id => !assignedLockerIds.includes(id));
 
-      // Batch update lockers to assign
       if (lockersToAssign.length > 0) {
         const { error: assignError } = await supabase
           .from('lockers')
           .update({ client_id: clientId })
           .in('id', lockersToAssign);
-
         if (assignError) throw assignError;
       }
 
-      // Batch update lockers to unassign (set client_id to null)
-      // Consider if unassigning here is desired or should be prevented
       if (lockersToUnassign.length > 0) {
         const { error: unassignError } = await supabase
           .from('lockers')
-          .update({ client_id: null }) // Or omit this part if unassigning is not allowed in this modal
+          .update({ client_id: null })
           .in('id', lockersToUnassign);
-
         if (unassignError) throw unassignError;
       }
 
-      // --- 4. Reset Form and Close ---
-      // Reset form states
       setFormData({
         name: '',
         location: '',
@@ -299,17 +332,17 @@ const AddClientModal = ({
         email: '',
         phone: '',
         notes: '',
-        // auth_method removed
       });
       setAssignedLockerIds([]);
       setInitialAssignedLockerIds([]);
-      setSelectedAuthMethods([]);
+      setSelectedAuthMethodIds([]); 
+      setInitialSelectedAuthMethodIds([]);
       setClientSettingsId(null);
       setErrors({});
       onClientAdded?.(clientData);
       onClose();
     } catch (error) {
-      console.error('Error saving client/settings/lockers:', error);
+      console.error('Error saving client/settings/lockers/auth:', error);
       setErrors({ submit: error.message || 'An unexpected error occurred. Please try again.' });
     } finally {
       setLoading(false);
@@ -325,25 +358,17 @@ const AddClientModal = ({
         email: '',
         phone: '',
         notes: '',
-        // auth_method removed
       });
       setAssignedLockerIds([]);
       setInitialAssignedLockerIds([]);
-      setSelectedAuthMethods([]);
+      setSelectedAuthMethodIds([]); 
+      setInitialSelectedAuthMethodIds([]);
       setClientSettingsId(null);
       setErrors({});
       onClose();
     }
   };
 
-  // Define available auth methods
-  const authMethods = [
-    { value: 'qr_code', label: 'QR Code' },
-    { value: 'password', label: 'Password' },
-    { value: 'face', label: 'Face Recognition' },
-    { value: 'palm', label: 'Palm Reader' },
-    { value: 'card_reader', label: 'Card Reader' }
-  ];
 
   return (
     <FormModal
@@ -367,7 +392,6 @@ const AddClientModal = ({
             </div>
           </div>
         )}
-
         {/* Basic Information Section */}
         <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
           <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
@@ -431,30 +455,32 @@ const AddClientModal = ({
             {/* --- Multi-Select Authentication Methods --- */}
             <div>
               <Label className="block text-sm font-medium text-gray-700 mb-2">
-                Authentication Methods
+                Authentication Methods *
               </Label>
               <p className="text-xs text-gray-500 mb-2">Select one or more methods users can use to access lockers for this client.</p>
 
               {/* Display Selected Methods Summary */}
-              {selectedAuthMethods.length > 0 && (
+              {selectedAuthMethodIds.length > 0 && (
                 <div className="mb-3 p-3 bg-blue-50 rounded-md border border-blue-100">
                   <p className="text-xs font-medium text-blue-800 flex items-center gap-1 mb-2">
                     <Eye className="w-3.5 h-3.5" /> Selected Methods:
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedAuthMethods.map((methodValue) => {
-                      const methodLabel = authMethods.find(m => m.value === methodValue)?.label || methodValue;
-                      // Simple icon mapping based on method name
+                    {selectedAuthMethodIds.map((methodId) => {
+                      const method = availableAuthMethods.find(m => m.id === methodId);
+                      if (!method) return null; // Handle case where method ID is not found
+                      const methodLabel = method.name || method.technical_name || 'Unknown Method';
+                      // Simple icon mapping based on method name/technical_name
                       let IconComponent = Shield; // Default
-                      if (methodValue.includes('qr')) IconComponent = Package;
-                      if (methodValue.includes('password')) IconComponent = Lock;
-                      if (methodValue.includes('face')) IconComponent = User;
-                      if (methodValue.includes('palm')) IconComponent = Hand; 
-                      if (methodValue.includes('card')) IconComponent = CreditCard; 
-
+                      const lowerName = (method.technical_name || method.name || '').toLowerCase();
+                      if (lowerName.includes('qr')) IconComponent = Package;
+                      if (lowerName.includes('password')) IconComponent = Lock;
+                      if (lowerName.includes('face')) IconComponent = User;
+                      if (lowerName.includes('palm')) IconComponent = Hand;
+                      if (lowerName.includes('card')) IconComponent = CreditCard;
                       return (
                         <span
-                          key={methodValue}
+                          key={methodId}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                         >
                           <IconComponent className="w-3.5 h-3.5" />
@@ -466,34 +492,34 @@ const AddClientModal = ({
                 </div>
               )}
 
-              {/* Checkbox Group */}
+              {/* Checkbox Group for Available Auth Methods */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
-                {authMethods.length > 0 ? (
-                  authMethods.map((method) => {
-                    const isSelected = selectedAuthMethods.includes(method.value);
+                {availableAuthMethods.length > 0 ? (
+                  availableAuthMethods.map((method) => {
+                    const isSelected = selectedAuthMethodIds.includes(method.id);
                     return (
-                      <div key={method.value} className="flex items-center space-x-2">
+                      <div key={method.id} className="flex items-center space-x-2">
                         <Checkbox
-                          id={`auth-method-${method.value}`}
+                          id={`auth-method-${method.id}`}
                           checked={isSelected}
-                          onCheckedChange={() => handleAuthMethodToggle(method.value)}
+                          onCheckedChange={() => handleAuthMethodToggle(method.id)}
                           disabled={loading}
                         />
                         <Label
-                          htmlFor={`auth-method-${method.value}`}
+                          htmlFor={`auth-method-${method.id}`}
                           className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${isSelected ? 'text-purple-600' : 'text-gray-700'}`}
                         >
-                          {method.label}
+                          {method.name || method.technical_name}
                         </Label>
                       </div>
                     );
                   })
                 ) : (
-                  <p className="text-sm text-gray-500 col-span-2">No authentication methods configured.</p>
+                  <p className="text-sm text-gray-500 col-span-2">No authentication methods available.</p>
                 )}
               </div>
 
-              {/* Optional: Add validation error display */}
+              {/* Validation Error for Auth Methods */}
               {errors.auth_methods && (
                 <p className="text-red-600 text-sm mt-1 flex items-center space-x-1">
                   <AlertCircle className="w-4 h-4" />
@@ -519,10 +545,8 @@ const AddClientModal = ({
                     const isAvailable = !locker.client_id || locker.client_id === editClient?.id;
                     const isAssigned = assignedLockerIds.includes(locker.id);
                     const wasInitiallyAssigned = initialAssignedLockerIds.includes(locker.id);
-
                     // Disable checkbox if locker is assigned to another client or if modal is loading
                     const isDisabled = loading || !isAvailable;
-
                     return (
                       <div
                         key={locker.id}
