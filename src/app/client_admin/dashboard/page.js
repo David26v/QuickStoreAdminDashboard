@@ -1,529 +1,577 @@
-'use client';
+'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Area, AreaChart, RadialBarChart, RadialBar } from 'recharts';
-import { TrendingUp, Users, Calendar, Clock, Activity, ArrowUpRight, ArrowDownRight, CheckCircle, XCircle, AlertCircle, Eye, Target, Zap, Award } from 'lucide-react';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  Lock,
+  DoorOpen,
+  DoorClosed,
+  AlertTriangle,
+  Activity,
+  Bell,
+  Building2,
+  Zap,
+  Users,
+  History,
+  Settings,
+  AlertCircle,
+  CheckCircle,
+  TrendingUp
+} from 'lucide-react';
+// Import Chart.js components
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+} from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import supabase from '@/lib/helper'; // Adjust path as needed
+import { useUser } from '@/components/providers/UserContext'; // Adjust path as needed
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Adjust path as needed
+import { Button } from '@/components/ui/button'; // Adjust path as needed
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Adjust path as needed
 
-const AdminDashboard = () => {
-  // Custom color palette based on #1c69ff
-  const colors = {
-    primary: '#1c69ff',
-    primaryLight: '#4d85ff',
-    primaryDark: '#0052e6',
-    success: '#00d25b',
-    warning: '#ffb800',
-    danger: '#ff4757',
-    info: '#00d4ff',
-    purple: '#8b5cf6',
-    pink: '#ec4899',
-    gradient1: 'linear-gradient(135deg, #1c69ff 0%, #4d85ff 100%)',
-    gradient2: 'linear-gradient(135deg, #1c69ff 0%, #8b5cf6 100%)',
-    gradient3: 'linear-gradient(135deg, #00d25b 0%, #1c69ff 100%)',
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
+
+// --- Data Fetching Hooks ---
+
+// Hook to fetch client information
+const useClientInfo = (clientId) => {
+  const [clientInfo, setClientInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchClientInfo = async () => {
+      if (!clientId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, name, location')
+          .eq('id', clientId)
+          .single();
+
+        if (error) throw error;
+        if (!data) {
+          throw new Error("Client not found.");
+        }
+        setClientInfo(data);
+      } catch (err) {
+        console.error("Error fetching client info:", err);
+        setError(err.message || "Failed to load client information.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientInfo();
+  }, [clientId]);
+
+  return { clientInfo, loading, error };
+};
+
+// Hook to fetch client's lockers
+const useClientLockers = (clientId) => {
+  const [lockers, setLockers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchLockers = async () => {
+      if (!clientId) return;
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('lockers')
+          .select('id, locker_number, door_count, client_id')
+          .eq('client_id', clientId)
+          .order('locker_number', { ascending: true });
+
+        if (error) throw error;
+        setLockers(data || []);
+      } catch (err) {
+        console.error("Error fetching client lockers:", err);
+        setError(err.message || "Failed to load lockers.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLockers();
+  }, [clientId]);
+
+  return { lockers, loading, error };
+};
+
+// Hook to fetch aggregated dashboard data (doors, activity, notifications)
+const useDashboardData = (clientId) => {
+  const [dashboardData, setDashboardData] = useState({
+    doors: [],
+    recentActivity: [],
+    notifications: [],
+    loading: true,
+    error: null
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!clientId) return;
+
+      try {
+        setDashboardData(prev => ({ ...prev, loading: true, error: null }));
+
+        // 1. Fetch all doors for the client's lockers
+        const { data: doorsData, error: doorsError } = await supabase
+          .from('locker_doors')
+          .select(`
+            id,
+            door_number,
+            status,
+            locker_id,
+            assigned_at,
+            locker:lockers!inner(locker_number, client_id)
+          `)
+          .eq('locker.client_id', clientId)
+          .order('locker_id', { ascending: true })
+          .order('door_number', { ascending: true });
+
+        if (doorsError) throw doorsError;
+
+        // 2. Fetch recent activity (example: last 10 door events)
+        // Note: You might want to join with clients_users for user details
+        const { data: activityData, error: activityError } = await supabase
+          .from('locker_door_events')
+          .select(`
+            id,
+            event_type,
+            created_at,
+            locker_door_id,
+            locker_door:locker_doors!inner(door_number, locker:lockers!inner(locker_number, client_id))
+          `)
+          .eq('locker_door.locker.client_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (activityError) throw activityError;
+
+        // 3. Fetch notifications (example: overdue doors)
+        // This is a simplified example. You might have a dedicated notifications table.
+        const { data: notificationsData, error: notificationsError } = await supabase
+          .from('locker_doors')
+          .select(`
+            id,
+            door_number,
+            status,
+            assigned_at,
+            locker:lockers!inner(locker_number, client_id)
+          `)
+          .eq('locker.client_id', clientId)
+          .eq('status', 'overdue')
+          .order('assigned_at', { ascending: true }) // Oldest overdue first
+          .limit(5); // Limit notifications
+
+        if (notificationsError) throw notificationsError;
+
+        // Format activity data
+        const formattedActivity = activityData.map(event => {
+            let message = `Unknown event for Door ${event.locker_door?.door_number || 'N/A'}`;
+            if (event.locker_door?.locker?.locker_number !== undefined) {
+                 message = `Door ${event.locker_door.door_number} (Locker ${event.locker_door.locker.locker_number}) was ${event.event_type}`;
+            }
+            return {
+                id: event.id,
+                type: event.event_type, // 'opened', 'closed', 'locked', 'unlocked'
+                message: message,
+                time: new Date(event.created_at).toLocaleString(), // Or use date-fns for relative time
+            };
+        });
+
+        // Format notifications data (simple overdue list)
+        const formattedNotifications = notificationsData.map(door => ({
+            id: door.id,
+            type: 'warning', // Default type for overdue
+            message: `Door ${door.door_number} (Locker ${door.locker.locker_number}) is overdue.`,
+            time: door.assigned_at ? new Date(door.assigned_at).toLocaleString() : 'Unknown',
+        }));
+
+        setDashboardData({
+          doors: doorsData || [],
+          recentActivity: formattedActivity,
+          notifications: formattedNotifications,
+          loading: false,
+          error: null
+        });
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setDashboardData(prev => ({
+          ...prev,
+          loading: false,
+          error: err.message || "Failed to load dashboard data."
+        }));
+      }
+    };
+
+    fetchData();
+  }, [clientId]);
+
+  return dashboardData;
+};
+
+// --- Main Component ---
+
+const ClientDashboard = () => {
+  const { clientId, loading: userContextLoading } = useUser();
+
+  const { clientInfo, loading: clientInfoLoading, error: clientInfoError } = useClientInfo(clientId);
+  const { lockers, loading: lockersLoading } = useClientLockers(clientId);
+  const { doors, recentActivity, notifications, loading: dashboardDataLoading, error: dashboardDataError } = useDashboardData(clientId);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Determine overall loading state
+  useEffect(() => {
+    if (!userContextLoading && !clientInfoLoading && !lockersLoading && !dashboardDataLoading) {
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+  }, [userContextLoading, clientInfoLoading, lockersLoading, dashboardDataLoading]);
+
+  // Determine overall error state
+  useEffect(() => {
+     const errorMessage = clientInfoError || dashboardDataError;
+     if (errorMessage) {
+        setError(errorMessage);
+     } else {
+        setError(null);
+     }
+  }, [clientInfoError, dashboardDataError]);
+
+
+  // Calculate statistics based on fetched data
+  const totalLockers = lockers.length;
+  const totalDoors = doors.length;
+  const occupiedCount = doors.filter(d => d.status === 'occupied').length;
+  const availableCount = doors.filter(d => d.status === 'available').length;
+  const overdueCount = doors.filter(d => d.status === 'overdue').length;
+
+  // Prepare data for charts
+  const statusChartData = {
+    labels: ['Occupied', 'Available', 'Overdue'],
+    datasets: [
+      {
+        label: 'Doors',
+        data: [occupiedCount, availableCount, overdueCount],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)', // Blue for occupied
+          'rgba(34, 197, 94, 0.8)',  // Green for available
+          'rgba(239, 68, 68, 0.8)'   // Red for overdue
+        ],
+        borderColor: [
+          'rgba(59, 130, 246, 1)',
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)'
+        ],
+        borderWidth: 1,
+      },
+    ],
   };
 
-  const summaryMetrics = [
-    {
-      title: 'Total Employees',
-      value: '125',
-      change: '+2%',
-      trend: 'up',
-      description: 'vs last month',
-      icon: Users,
-      color: colors.primary,
-      bgGradient: 'from-blue-500/10 to-blue-600/20',
+  // Simulate weekly usage data - In a real scenario, you'd aggregate historical data
+  // For now, we'll keep it static or derive from current state if needed differently
+  const usageChartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        label: 'Usage %',
+        data: [70, 80, 60, 90, 95, 85, 75], // Placeholder data
+        fill: true,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        tension: 0.4,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+      },
     },
-    {
-      title: 'Attendance Today',
-      value: '98',
-      change: '+5%',
-      trend: 'up',
-      description: 'vs yesterday',
-      icon: Activity,
-      color: colors.success,
-      bgGradient: 'from-green-500/10 to-green-600/20',
-    },
-    {
-      title: 'Active Projects',
-      value: '8',
-      change: '+1%',
-      trend: 'up',
-      description: 'vs last week',
-      icon: Target,
-      color: colors.purple,
-      bgGradient: 'from-purple-500/10 to-purple-600/20',
-    },
-    {
-      title: 'Pending Requests',
-      value: '4',
-      change: '-10%',
-      trend: 'down',
-      description: 'vs last week',
-      icon: Clock,
-      color: colors.warning,
-      bgGradient: 'from-yellow-500/10 to-yellow-600/20',
-    },
-  ];
+  };
 
-  const attendanceData = [
-    { day: 'Mon', present: 120, absent: 5, rate: 96 },
-    { day: 'Tue', present: 118, absent: 7, rate: 94 },
-    { day: 'Wed', present: 122, absent: 3, rate: 98 },
-    { day: 'Thu', present: 125, absent: 0, rate: 100 },
-    { day: 'Fri', present: 119, absent: 6, rate: 95 },
-    { day: 'Sat', present: 95, absent: 30, rate: 76 },
-    { day: 'Sun', present: 85, absent: 40, rate: 68 },
-  ];
-
-  const projectProgressData = [
-    { project: 'Website Redesign', progress: 85, status: 'on-track', dueDate: '2025-07-15', team: 5 },
-    { project: 'Mobile App', progress: 65, status: 'at-risk', dueDate: '2025-07-20', team: 3 },
-    { project: 'API Integration', progress: 95, status: 'on-track', dueDate: '2025-07-10', team: 4 },
-    { project: 'Database Migration', progress: 40, status: 'on-track', dueDate: '2025-08-01', team: 2 },
-    { project: 'Security Audit', progress: 25, status: 'delayed', dueDate: '2025-07-25', team: 6 },
-  ];
-
-  const leaveRequestData = [
-    { name: 'Approved', value: 24, color: colors.success },
-    { name: 'Pending', value: 4, color: colors.warning },
-    { name: 'Rejected', value: 3, color: colors.danger },
-  ];
-
-  const monthlyTrendsData = [
-    { month: 'Jan', employees: 115, attendance: 92, projects: 6 },
-    { month: 'Feb', employees: 118, attendance: 94, projects: 7 },
-    { month: 'Mar', employees: 120, attendance: 91, projects: 8 },
-    { month: 'Apr', employees: 123, attendance: 95, projects: 8 },
-    { month: 'May', employees: 125, attendance: 98, projects: 8 },
-  ];
-
-  const departmentData = [
-    { name: 'Engineering', value: 45, color: colors.primary },
-    { name: 'Marketing', value: 25, color: colors.info },
-    { name: 'Sales', value: 20, color: colors.success },
-    { name: 'HR', value: 15, color: colors.purple },
-    { name: 'Finance', value: 12, color: colors.pink },
-    { name: 'Operations', value: 8, color: colors.warning },
-  ];
-
-  const performanceData = [
-    { metric: 'Productivity', value: 85, max: 100 },
-    { metric: 'Team Satisfaction', value: 92, max: 100 },
-    { metric: 'Goal Achievement', value: 78, max: 100 },
-    { metric: 'Innovation Index', value: 88, max: 100 },
-  ];
-
-  const recentActivities = [
-    { user: 'John Doe', action: 'submitted leave request', time: '2 minutes ago', type: 'leave' },
-    { user: 'Sarah Smith', action: 'completed project milestone', time: '15 minutes ago', type: 'project' },
-    { user: 'Mike Johnson', action: 'checked in', time: '1 hour ago', type: 'attendance' },
-    { user: 'Emily Brown', action: 'updated project status', time: '2 hours ago', type: 'project' },
-    { user: 'Alex Wilson', action: 'requested overtime approval', time: '3 hours ago', type: 'request' },
-  ];
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'on-track': { variant: 'default', icon: CheckCircle, text: 'On Track', color: colors.success },
-      'at-risk': { variant: 'secondary', icon: AlertCircle, text: 'At Risk', color: colors.warning },
-      'delayed': { variant: 'destructive', icon: XCircle, text: 'Delayed', color: colors.danger },
-    };
-    
-    const config = statusConfig[status] || statusConfig['on-track'];
-    const Icon = config.icon;
-    
+  // Handle loading and error states
+  if (userContextLoading || isLoading) {
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {config.text}
-      </Badge>
+      <div className="min-h-screen  flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your dashboard...</p>
+        </div>
+      </div>
     );
-  };
+  }
 
-  const getActivityIcon = (type) => {
-    const icons = {
-      leave: Calendar,
-      project: Target,
-      attendance: Activity,
-      request: Clock,
-    };
-    return icons[type] || Activity;
-  };
+  if (error || !clientId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {error || "Client ID not found. Please ensure you are logged in correctly."}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!clientInfo) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+              <AlertTitle className="text-lg font-semibold text-gray-800 mb-2">Client Not Found</AlertTitle>
+              <AlertDescription className="text-gray-600">
+                Unable to find information for your client account.
+              </AlertDescription>
+            </CardContent>
+          </Card>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen ">
-      <div className="flex-1 space-y-8 p-6 max-w-7xl mx-auto">
-        {/* Enhanced Header */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl"></div>
-          <div className="relative p-8 rounded-3xl border border-blue-200/50 bg-white/80 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-8 rounded-full" style={{ background: colors.gradient1 }}></div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-blue-800 bg-clip-text text-transparent">
-                    Admin Dashboard
-                  </h1>
-                </div>
-                <p className="text-gray-600 text-lg">
-                  Monitor and manage your organization&apos;s performance
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-200/50">
-                  <Eye className="h-6 w-6" style={{ color: colors.primary }} />
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Last updated</p>
-                  <p className="font-semibold" style={{ color: colors.primary }}>Just now</p>
-                </div>
-              </div>
-            </div>
-          </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Client Title */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">{clientInfo.name} - Dashboard</h1>
+          {clientInfo.location && <p className="text-sm text-gray-500">Location: {clientInfo.location}</p>}
+          <p className="text-sm text-gray-500 mt-1">Welcome back! Here's an overview of your locker system.</p>
         </div>
 
-        {/* Enhanced Summary Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {summaryMetrics.map((metric, index) => {
-            const Icon = metric.icon;
-            return (
-              <Card key={index} className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0 shadow-lg overflow-hidden bg-white/90 backdrop-blur-sm">
-                <div className={`h-1 bg-gradient-to-r ${metric.bgGradient}`}></div>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-gray-600">
-                      {metric.title}
-                    </CardTitle>
-                    <div 
-                      className="p-3 rounded-xl group-hover:scale-110 transition-transform duration-300"
-                      style={{ backgroundColor: `${metric.color}15` }}
-                    >
-                      <Icon className="h-5 w-5" style={{ color: metric.color }} />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="text-3xl font-bold text-gray-900">{metric.value}</div>
-                    <div className="flex items-center gap-2">
-                      {metric.trend === 'up' ? (
-                        <ArrowUpRight className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-500" />
-                      )}
-                      <span className={`text-sm font-semibold ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                        {metric.change}
-                      </span>
-                      <span className="text-sm text-gray-500">{metric.description}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Main Charts Grid */}
-        <div className="grid gap-6 md:grid-cols-12">
-          {/* Attendance Trends */}
-          <Card className="md:col-span-8 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.primary}15` }}>
-                  <TrendingUp className="h-5 w-5" style={{ color: colors.primary }} />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Weekly Attendance Analytics</CardTitle>
-                  <CardDescription>Real-time attendance tracking and trends</CardDescription>
-                </div>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6 flex items-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                <Building2 className="w-6 h-6 text-blue-600" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={attendanceData}>
-                  <defs>
-                    <linearGradient id="attendanceGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={colors.primary} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={colors.primary} stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="day" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
-                            <p className="font-semibold text-gray-800">{label}</p>
-                            <p style={{ color: colors.primary }}>
-                              Present: {payload[0]?.value}
-                            </p>
-                            <p className="text-gray-500">
-                              Attendance Rate: {payload[0]?.payload?.rate}%
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="present"
-                    stroke={colors.primary}
-                    strokeWidth={3}
-                    fill="url(#attendanceGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Lockers</p>
+                <p className="text-2xl font-bold text-gray-900">{totalLockers}</p>
+              </div>
             </CardContent>
           </Card>
-
-          {/* Performance Metrics */}
-          <Card className="md:col-span-4 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-green-500 to-blue-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.success}15` }}>
-                  <Award className="h-5 w-5" style={{ color: colors.success }} />
-                </div>
-                <div>
-                  <CardTitle>Performance KPIs</CardTitle>
-                  <CardDescription>Key performance indicators</CardDescription>
-                </div>
+          <Card>
+            <CardContent className="p-6 flex items-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                <Lock className="w-6 h-6 text-blue-600" />
               </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Doors</p>
+                <p className="text-2xl font-bold text-gray-900">{totalDoors}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6 flex items-center">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                <DoorOpen className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Available</p>
+                <p className="text-2xl font-bold text-green-600">{availableCount}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6 flex items-center">
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Overdue</p>
+                <p className="text-2xl font-bold text-red-600">{overdueCount}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg">
+                <PieChartIcon className="w-5 h-5 mr-2 text-blue-500" />
+                Door Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-64">
+              <Pie data={statusChartData} options={chartOptions} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg">
+                <BarChartIcon className="w-5 h-5 mr-2 text-orange-500" />
+                Placeholder Chart
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-64">
+              {/* You can add another relevant chart here, e.g., doors per locker */}
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <p>Doors per Locker (Example)</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg">
+                <TrendingUp className="w-5 h-5 mr-2 text-blue-500" />
+                Weekly Usage Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-64">
+              <Line data={usageChartData} options={chartOptions} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Activity and Notifications & Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Activity */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg">
+                <Activity className="w-5 h-5 mr-2 text-blue-500" />
+                Recent Activity
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {performanceData.map((item, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{item.metric}</span>
-                      <span className="text-sm font-bold" style={{ color: colors.primary }}>
-                        {item.value}%
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000 ease-out"
-                        style={{
-                          width: `${item.value}%`,
-                          background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.primaryLight} 100%)`
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Project Progress & Department Distribution */}
-        <div className="grid gap-6 md:grid-cols-12">
-          {/* Enhanced Project Progress */}
-          <Card className="md:col-span-7 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.purple}15` }}>
-                  <Target className="h-5 w-5" style={{ color: colors.purple }} />
-                </div>
-                <div>
-                  <CardTitle>Active Projects</CardTitle>
-                  <CardDescription>Current project status and progress</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {projectProgressData.map((project, index) => (
-                  <div key={index} className="p-4 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="space-y-1">
-                        <p className="font-semibold text-gray-800">{project.project}</p>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>Due: {new Date(project.dueDate).toLocaleDateString()}</span>
-                          <span>Team: {project.team} members</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold" style={{ color: colors.primary }}>
-                          {project.progress}%
-                        </span>
-                        {getStatusBadge(project.status)}
-                      </div>
-                    </div>
-                    <Progress value={project.progress} className="h-2" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Department Distribution */}
-          <Card className="md:col-span-5 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.info}15` }}>
-                  <Users className="h-5 w-5" style={{ color: colors.info }} />
-                </div>
-                <div>
-                  <CardTitle>Department Distribution</CardTitle>
-                  <CardDescription>Employee allocation by department</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={departmentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {departmentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border">
-                            <p className="font-semibold">{payload[0].payload.name}</p>
-                            <p style={{ color: payload[0].payload.color }}>
-                              {payload[0].value} employees
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                {departmentData.map((dept, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }}></div>
-                    <span className="text-xs text-gray-600">{dept.name}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Bottom Section - Recent Activity & Leave Requests */}
-        <div className="grid gap-6 md:grid-cols-12">
-          {/* Enhanced Recent Activity */}
-          <Card className="md:col-span-8 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.success}15` }}>
-                  <Activity className="h-5 w-5" style={{ color: colors.success }} />
-                </div>
-                <div>
-                  <CardTitle>Recent Activity Feed</CardTitle>
-                  <CardDescription>Latest updates and actions from your team</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {recentActivities.map((activity, index) => {
-                  const Icon = getActivityIcon(activity.type);
-                  return (
-                    <div key={index} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50/50 transition-colors">
-                      <div 
-                        className="p-2 rounded-lg flex-shrink-0"
-                        style={{ backgroundColor: `${colors.primary}15` }}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: colors.primary }} />
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-start space-x-3">
+                      <div className="mt-1 flex-shrink-0">
+                        {activity.type === 'opened' || activity.type === 'unlocked' ? <DoorOpen className="w-4 h-4 text-blue-500" /> :
+                         activity.type === 'closed' || activity.type === 'locked' ? <DoorClosed className="w-4 h-4 text-green-500" /> :
+                         <Activity className="w-4 h-4 text-gray-500" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900">{activity.user}</p>
-                        <p className="text-sm text-gray-600">{activity.action}</p>
-                      </div>
-                      <div className="text-xs text-gray-500 flex-shrink-0">
-                        {activity.time}
+                        <p className="text-sm text-gray-900">{activity.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
                       </div>
                     </div>
-                  );
-                })}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No recent activity found.</p>
+                )}
               </div>
+              {/* <Button variant="ghost" className="w-full mt-4 py-2 text-sm text-orange-600 hover:text-orange-700 font-medium">
+                View all activity
+              </Button> */}
             </CardContent>
           </Card>
 
-          {/* Leave Requests */}
-          <Card className="md:col-span-4 border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.warning}15` }}>
-                  <Calendar className="h-5 w-5" style={{ color: colors.warning }} />
+          <div className="space-y-8">
+            {/* Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <Bell className="w-5 h-5 mr-2 text-orange-500" />
+                  Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification) => (
+                      <div key={notification.id} className="flex items-start space-x-3">
+                        <div className="mt-0.5 flex-shrink-0">
+                          <AlertTriangle className="w-5 h-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900">{notification.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No notifications.</p>
+                  )}
                 </div>
-                <div>
-                  <CardTitle>Leave Overview</CardTitle>
-                  <CardDescription>Current month summary</CardDescription>
+                {/* <Button variant="ghost" className="w-full mt-4 py-2 text-sm text-orange-600 hover:text-orange-700 font-medium">
+                  View all notifications
+                </Button> */}
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <Zap className="w-5 h-5 mr-2 text-yellow-500" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Button variant="outline" className="w-full justify-start space-x-3">
+                    <Users className="w-5 h-5 text-blue-500" />
+                    <span>Manage Users</span>
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start space-x-3">
+                    <History className="w-5 h-5 text-purple-500" />
+                    <span>View Overdue Reports</span>
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start space-x-3">
+                    <Settings className="w-5 h-5 text-gray-500" />
+                    <span>System Settings</span>
+                  </Button>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={leaveRequestData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {leaveRequestData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-3 mt-4">
-                {leaveRequestData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-gray-50/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                      <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                    </div>
-                    <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
-export default AdminDashboard;
+// Simple placeholder icons for chart titles
+const PieChartIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>;
+const BarChartIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+
+export default ClientDashboard;

@@ -1,23 +1,22 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState } from "react"; // Removed useEffect as it wasn't used
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { FiSun, FiMoon } from "react-icons/fi";
+// FiSun, FiMoon were imported but not used, removed
 import Image from "next/image";
 import UserAvatarMenu from "./UserAvatarMenu";
-import ZentryNotificationDemo from "./notificationBell";
-import supabase from "@/lib/helper";
+import ZentryNotificationDemo from "./notificationBell"; // Ensure this path is correct
+import supabase from "@/lib/helper"; // Ensure this path is correct
 
-const Navbar = ({ openSideBar ,user }) => {
+const Navbar = ({ openSideBar, user }) => { // Accepting user prop
   const [open, setOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   
   const router = useRouter();
 
-
-
-
+  // --- Mock Notifications (for demo purposes) ---
+  // In a real app, these would likely come from an API or WebSocket
   const notifications = [
     {
       id: 1,
@@ -43,22 +42,23 @@ const Navbar = ({ openSideBar ,user }) => {
   ];
 
   const unreadCount = notifications.filter(n => n.unread).length;
-
-
-
+  // --- End Mock Notifications ---
 
   const handleLogout = async () => {
-    
     const { error } = await supabase.auth.signOut();
   
     if (error) {
       console.error("Logout error:", error.message);
+      // Optionally, display an error message to the user
       return;
     }
   
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("username");
+    // Clear any local storage items related to auth if needed
+    // (Supabase handles its own session cookies/tokens)
+    // localStorage.removeItem("authToken");
+    // localStorage.removeItem("username");
   
+    // Redirect to login page
     router.push("/forms/login");
   };
 
@@ -71,6 +71,7 @@ const Navbar = ({ openSideBar ,user }) => {
             <button 
               onClick={openSideBar} 
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              aria-label="Toggle Sidebar" // Added aria-label for accessibility
             >
               <Image src="/Menu.svg" alt="Menu Icon" width={20} height={20} className="dark:invert" />
             </button>
@@ -79,18 +80,17 @@ const Navbar = ({ openSideBar ,user }) => {
               <span className="pl-4 pr-2">
                 <Image src="/search.png" alt="Search Icon" width={18} height={18} className="opacity-60 dark:invert" />
               </span>
+              {/* Updated placeholder text */}
               <Input
                 type="text"
-                placeholder="Search anything..."
+                placeholder="Search modules or users..." // Made placeholder more specific
                 className="w-full bg-transparent border-none focus-visible:ring-0 text-gray-700 dark:text-gray-300 placeholder:text-gray-500 dark:placeholder:text-gray-400 py-3"
               />
             </div>
           </div>
 
-          {/* Right side: Dark Mode Toggle, Notification and Avatar */}
+          {/* Right side: Notification and Avatar */}
           <div className="flex items-center space-x-4">
-            {/* Dark Mode Toggle */}
-           
             {/* Notification Bell */}
             <ZentryNotificationDemo
               notificationOpen={notificationOpen}
@@ -102,11 +102,12 @@ const Navbar = ({ openSideBar ,user }) => {
             {/* Divider */}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
 
-            {/* User Avatar */}
+            {/* User Avatar Menu */}
+            {/* Passing the 'user' prop down, which contains first_name, last_name, avatar, etc. */}
             <UserAvatarMenu
               open={open}
               setOpen={setOpen}
-              user={user}
+              user={user} // This is the key prop being passed
               handleLogout={handleLogout}
               getInitials={(first, last) => `${first?.[0] ?? ''}${last?.[0] ?? ''}`}
             />

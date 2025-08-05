@@ -47,13 +47,13 @@ const ClientView = () => {
       if (!client_id) {
         console.log("client_id is not available yet.");
         setLoading(false);
-        return; // Exit early if no client_id
+        return; 
       }
 
       setLoading(true);
       setFetchError(null);
       try {
-        // --- Fetch client data and locker assignments ---
+    
         const { data: clientInfo, error: clientError } = await supabase
           .from('clients')
           .select(`
@@ -77,27 +77,24 @@ const ClientView = () => {
 
         if (clientError) {
            console.error("Supabase error fetching client information:", clientError.message);
-           // Handle specific "not found" error if needed (e.g., PGRST116)
            setFetchError(clientError.message);
            setClientData(null);
-           return; // Stop execution if client fetch fails
+           return; 
         }
 
-        // --- Fetch authentication methods for the client ---
         let authMethodsList = [];
-        // 1. Get the client_locker_settings ID for this client
+
         const { data: settingsData, error: settingsError } = await supabase
           .from('client_locker_settings')
           .select('id')
           .eq('client_id', client_id)
-          .single(); // There should be only one settings record per client
+          .single(); 
 
-        if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 means not found, which is okay initially
-             throw settingsError; // Re-throw other errors
+        if (settingsError && settingsError.code !== 'PGRST116') { 
+             throw settingsError; 
         }
 
         if (settingsData) {
-            // 2. If settings exist, get the associated auth method IDs
             const { data: clientAuthMethodsData, error: clientAuthMethodsError } = await supabase
               .from('client_auth_methods')
               .select('auth_method_id')
@@ -105,32 +102,25 @@ const ClientView = () => {
 
             if (clientAuthMethodsError) throw clientAuthMethodsError;
 
-            // 3. Get the full auth method details for those IDs
             const authMethodIds = clientAuthMethodsData?.map(item => item.auth_method_id) || [];
             if (authMethodIds.length > 0) {
                 const { data: authMethodsData, error: authMethodsError } = await supabase
                   .from('auth_methods')
-                  .select('technical_name, name') // Select fields needed for display
+                  .select('technical_name, name')
                   .in('id', authMethodIds)
-                  .eq('is_active', true); // Only fetch active methods
+                  .eq('is_active', true); 
 
                  if (authMethodsError) throw authMethodsError;
 
-                 // Map fetched data to display format
+      
                  authMethodsList = authMethodsData?.map(method => ({
                     technical_name: method.technical_name,
                     name: method.name,
-                    // Use technical_name as key for display map lookup, fallback to name, then 'default'
                     displayKey: method.technical_name || method.name || 'default'
                  })) || [];
             }
         }
-        // If settingsData is null or no auth methods found, authMethodsList remains empty []
-
-        console.log('Fetched client data:', clientInfo);
-        console.log('Fetched auth methods:', authMethodsList);
-
-        // Combine client data with auth methods for state
+      
         setClientData({
             ...clientInfo,
             auth_methods: authMethodsList 
@@ -146,9 +136,9 @@ const ClientView = () => {
     };
 
     fetchClientInfo();
-  }, [client_id]); // Re-run effect if client_id changes
+  }, [client_id]); 
 
-  // --- Handle loading and error states ---
+
   if (loading) {
     return (
      <QuickStoreLoading message='client information is loading please wait '/>
@@ -172,7 +162,7 @@ const ClientView = () => {
     );
   }
 
-  // Ensure clientData is present after loading/error checks
+
   if (!clientData) {
     return (
       <div className="p-6">
@@ -189,7 +179,6 @@ const ClientView = () => {
     );
   }
 
-  // --- Use updated clientData for the main content ---
   const lockerCount = clientData?.lockers?.length || 0;
   const lockerAssignmentStatus = lockerCount > 0
     ? `${lockerCount} locker${lockerCount > 1 ? 's' : ''} assigned`

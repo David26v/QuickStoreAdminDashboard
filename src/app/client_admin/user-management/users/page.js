@@ -21,12 +21,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuickStoreLoadingCompact } from '@/components/ui/QuickStoreLoading';
 import DataTable from '@/components/ui/DataTable';
+import AddUserModal from './AddUserModal';
+import { useRouter } from 'next/navigation';
 
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     // Simulate API call
@@ -109,7 +112,7 @@ const UserManagement = () => {
   const userColumns = [
     {
       key: 'name_info', 
-      label: 'User',
+      label: 'Full Name',
       render: (_, user) => (
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-600 rounded-md flex items-center justify-center flex-shrink-0"> {/* Use orange gradient */}
@@ -122,22 +125,7 @@ const UserManagement = () => {
         </div>
       )
     },
-    {
-      key: 'locker_info',
-      label: 'Assigned Locker',
-      render: (_, user) => (
-        <div className="flex items-center space-x-2">
-          {user.assigned_locker_door ? (
-            <>
-              <Lock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-700 text-sm">{user.assigned_locker_door}</span>
-            </>
-          ) : (
-            <span className="text-gray-400 text-sm italic">Not Assigned</span>
-          )}
-        </div>
-      )
-    },
+ 
     {
       key: 'phone',
       label: 'Phone',
@@ -190,7 +178,7 @@ const UserManagement = () => {
     }
   ];
 
-  // Handle actions from the DataTable
+
   const handleUserAction = (action, user) => {
     console.log(`Action: ${action}`, user);
     // Implement view, edit, delete logic here
@@ -200,8 +188,12 @@ const UserManagement = () => {
 
 
   const handleViewUser = () =>{
-    
+    router.push(`/client_admin/user-management/users/${user_id}`)
   } 
+
+  const handleAddUser= () => {
+    router.push('/client_admin/user-management/users/AddUserPage')
+  }
 
   return (
     <div className="w-full p-4 md:p-6">
@@ -212,7 +204,10 @@ const UserManagement = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">User Management</h1>
             <p className="text-gray-600 text-sm md:text-base">Manage users for your client</p>
           </div>
-          <Button className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-full md:w-auto text-sm flex items-center justify-center">
+          <Button 
+           className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 w-full md:w-auto text-sm flex items-center justify-center"
+           onClick={handleAddUser}
+          >
             <Plus className="w-4 h-4 mr-2" />
             <span>Add New User</span>
           </Button>

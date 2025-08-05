@@ -143,7 +143,7 @@ const AdminSidebar = ({ isOpen, role }) => {
         { label: "Locker Status", icon: Activity, path: "/admin/maintenance/status" },
       ]
     },
-    // --- Communication & Content (Could be used for notifications, manuals) ---
+ 
     {
       label: "Communication", icon: MessageCircle, type: "group", children: [
         { label: "Announcements", icon: Megaphone, path: "/admin/communication/announcements" },
