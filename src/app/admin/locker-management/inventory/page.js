@@ -52,83 +52,84 @@ const LockerInventory = () => {
   useEffect(() => {
     fetchLockers();
   }, []);
-  const fetchLockers = async () => {
-    setLoading(true);
-    setError(null);
 
-    try {
-       const { data: lockersData, error: lockersError } = await supabase
-        .from('lockers')
-        .select(`
-          id,
-          locker_number,
-          status,
-          client_id,
-          assigned_to, 
-          assigned_at,
-          released_at,
-          created_at,
-          updated_at,
-          door_count,      
-          client:clients (
-            name,
-            location,
-            contact_person,
-            email,
-            phone
-          )
-        `);
-      // --- End Updated Query ---
-      if (lockersError) throw lockersError;
+ const fetchLockers = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    const { data: lockersData, error: lockersError } = await supabase
+      .from('lockers')
+      .select(`
+        id,
+        locker_number,
+        status,
+        client_id,
+        assigned_to, 
+        assigned_at,
+        released_at,
+        created_at,
+        updated_at,
+        door_count,      
+        client:clients (
+          name,
+          location,
+          contact_person,
+          email,
+          phone
+        )
+      `);
+
+    if (lockersError) throw lockersError;
+
+    const { data: devicesData, error: devicesError } = await supabase
+      .from('devices')
+      .select(`
+        id,
+        device_id,
+        manufacturer,
+        model,
+        android_version,
+        locker_id 
+      `);
+
+    if (devicesError) throw devicesError;
+
+
+    const formattedLockers = lockersData.map(locker => {
+      const device = devicesData.find(dev => dev.locker_id === locker.id); 
       
+      return {
+        id: locker.id,
+        locker_number: locker.locker_number,
+        status: locker.status,
+        client_id: locker.client_id,
+        assigned_at: locker.assigned_at,
+        released_at: locker.released_at,
+        created_at: locker.created_at,
+        updated_at: locker.updated_at,
+        door_count: locker.door_count,
+        client_name: locker.client?.name || null,
+        client_location: locker.client?.location || null,
+        contact_person: locker.client?.contact_person || null, 
+        email: locker.client?.email || null,
+        phone: locker.client?.phone || null,
+        device_id: device?.device_id || null,
+        device_manufacturer: device?.manufacturer || null,
+        device_model: device?.model || null,
+        device_android_version: device?.android_version || null,
+      };
+    });
 
-      const { data: devicesData, error: devicesError } = await supabase
-        .from('devices')
-        .select(`
-          id,
-          device_id,
-          manufacturer,
-          model,
-          android_version,
-          user_id
-        `);
-
-      if (devicesError) throw devicesError;
-
-
-     const formattedLockers = lockersData.map(locker => {
-        const device = devicesData.find(dev => dev.user_id === locker.assigned_to);
-        return {
-          id: locker.id,
-          locker_number: locker.locker_number,
-          status: locker.status,
-          client_id: locker.client_id,
-          assigned_at: locker.assigned_at,
-          released_at: locker.released_at,
-          created_at: locker.created_at,
-          updated_at: locker.updated_at,
-          door_count: locker.door_count,
-          client_name: locker.client?.name || null,
-          client_location: locker.client?.location || null,
-          contact_person: locker.client?.contact_person || null, 
-          email: locker.client?.email || null,
-          phone: locker.client?.phone || null,
-          device_id: device?.device_id || null,
-          device_manufacturer: device?.manufacturer || null,
-          device_model: device?.model || null,
-          device_android_version: device?.android_version || null,
-        };
-      });
-
-      setLockers(formattedLockers);
-      setFilteredLockers(formattedLockers);
-    } catch (error) {
-      console.error("Error fetching lockers:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setLockers(formattedLockers);
+    setFilteredLockers(formattedLockers);
+  } catch (error) {
+    console.error("Error fetching lockers:", error);
+    // Provide a user-friendly error message
+    setError(error.message || "An error occurred while fetching locker data. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   useEffect(() => {

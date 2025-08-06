@@ -123,7 +123,10 @@ const handleSubmit = async (e) => {
       router.push("/admin/dashboard");
     } else if (role === "employee") {
       router.push("/employees/dashboard");
-    } else {
+    } else if (role === "client_admin") {
+      router.push("/client_admin/dashboard");
+    }
+     else {
       setErrors({ general: `Unknown role: ${role}` });
     }
   } catch (err) {

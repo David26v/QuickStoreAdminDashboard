@@ -1,189 +1,300 @@
 'use client'
-import { Button } from "@/components/ui/button";
-
-import { useRouter } from "next/navigation";
-import { useEffect ,useState} from "react";
+import { useState, useEffect } from 'react';
+import { ChevronLeft, Home, HelpCircle, MessageCircle, Lock, Key, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import supabase from '@/lib/helper';
 
 export default function NotFound() {
-    const router = useRouter();
     const [isClient, setIsClient] = useState(false);
     const [particles, setParticles] = useState([]);
+    const [lockerStates, setLockerStates] = useState({});
+    const [userRole, setUserRole] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    const router = useRouter();
     
     useEffect(() => {
         setIsClient(true);
-        // Generate particles only on client side
-        setParticles([...Array(6)].map((_, i) => ({
+        fetchSessionUser();
+        
+        // Generate floating particles
+        setParticles([...Array(8)].map((_, i) => ({
             id: i,
             left: Math.random() * 100,
             top: Math.random() * 100,
             delay: Math.random() * 3,
             duration: 3 + Math.random() * 2
         })));
-    }, []);
-    
-    useEffect(() => {
-        if (isClient) {
-            const token = localStorage.getItem("token");
-            if (!token) {
-                router.push("/forms/login");
-            }
-        }
-    }, [router, isClient]);
 
-    const goHome = () => {
-        router.push("/");
+        const initialStates = {};
+        for (let i = 1; i <= 12; i++) {
+            initialStates[i] = {
+                isOpen: Math.random() > 0.7, 
+                animationDelay: Math.random() * 2
+            };
+        }
+        setLockerStates(initialStates);
+
+        // Animate lockers periodically
+        const interval = setInterval(() => {
+            setLockerStates(prev => {
+                const newStates = { ...prev };
+                const randomLocker = Math.floor(Math.random() * 12) + 1;
+                newStates[randomLocker] = {
+                    ...newStates[randomLocker],
+                    isOpen: !newStates[randomLocker].isOpen
+                };
+                return newStates;
+            });
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const fetchSessionUser = async () => {
+        try {
+            
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError || !session?.user) {
+                console.log("No active session");
+                return;
+            }
+
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", session.user.id)
+                .single();
+
+            if (profileError || !profile?.role) {
+                console.error("Error fetching user role:", profileError);
+                return;
+            }
+
+            setUserRole(profile.role);
+        
+        } catch (error) {
+            console.error("Error fetching session:", error);
+        }
     };
 
+    const goHome = async () => {
+        if (isLoading) return;
+        
+        setIsLoading(true);
+
+        try {
+            if (userRole === "admin") {
+                router.push("/admin/dashboard");
+            } 
+            else if (userRole === "client_admin") {
+                router.push("/client_admin/dashboard");
+            }
+            else {
+                router.push("/forms/login");
+            }
+        } catch (error) {
+            console.error("Navigation error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const goBack = () => {
+        router.push('/forms/login')
+    };
+
+    const QuickStoreLogo = ({ size = "w-16 h-16" }) => (
+        <div className={`relative inline-flex items-center justify-center ${size} bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-lg overflow-hidden`}>
+            <div className="absolute inset-2 bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl flex items-center justify-center shadow-inner">
+                <Shield className="h-1/2 w-1/2 text-slate-200" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                <Lock className="h-2.5 w-2.5 text-white" />
+            </div>
+        </div>
+    );
+
+    const LockerUnit = ({ id, isOpen, delay }) => (
+        <div 
+            className="relative w-16 h-20 transition-all duration-500"
+            style={{ animationDelay: `${delay}s` }}
+        >
+            {/* Locker frame */}
+            <div className="absolute inset-0 bg-gradient-to-b from-gray-300 to-gray-400 rounded-sm shadow-md">
+                {/* Locker door */}
+                <div 
+                    className={`absolute inset-1 bg-gradient-to-b transition-all duration-500 rounded-sm shadow-inner ${
+                        isOpen 
+                            ? 'from-orange-400 to-orange-500 transform translate-x-2 rotate-12 origin-left' 
+                            : 'from-gray-100 to-gray-200'
+                    }`}
+                >
+                    {/* Door handle */}
+                    <div className={`absolute right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 rounded-full transition-all duration-500 ${
+                        isOpen ? 'bg-orange-600' : 'bg-gray-400'
+                    }`}></div>
+                    
+                    {/* Lock indicator */}
+                    <div className="absolute left-1 top-1 w-3 h-2 bg-gray-500 rounded-sm flex items-center justify-center">
+                        {isOpen ? (
+                            <Key className="w-2 h-2 text-orange-300" />
+                        ) : (
+                            <Lock className="w-2 h-2 text-red-400" />
+                        )}
+                    </div>
+                </div>
+                
+                {/* Locker number */}
+                <div className="absolute bottom-0 left-0 right-0 text-center">
+                    <span className="text-xs font-bold text-gray-600">{id}</span>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-orange-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
             {/* Animated background elements */}
             <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-                <div className="absolute top-40 right-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
-                <div className="absolute -bottom-8 left-40 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
+                <div className="absolute top-20 left-20 w-72 h-72 bg-orange-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+                <div className="absolute top-40 right-20 w-72 h-72 bg-gray-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-2000"></div>
+                <div className="absolute -bottom-8 left-40 w-72 h-72 bg-orange-400 rounded-full mix-blend-multiply filter blur-xl animate-pulse animation-delay-4000"></div>
             </div>
             
             {/* Main content */}
-            <div className="relative z-10 text-center space-y-8 max-w-2xl mx-auto">
-                {/* 404 Number with gradient effect */}
+            <div className="relative z-10 text-center space-y-8 max-w-4xl mx-auto">
+                {/* QuickStore Logo */}
+                <div className="flex justify-center mb-8">
+                    <QuickStoreLogo size="w-20 h-20" />
+                </div>
+
+                {/* 404 Number with locker styling */}
                 <div className="relative">
-                    <h1 className="text-8xl md:text-9xl font-black bg-gradient-to-r from-[#1a67fe] via-blue-600 to-indigo-600 bg-clip-text text-transparent drop-shadow-lg animate-pulse">
+                    <h1 className="text-8xl md:text-9xl font-black bg-gradient-to-r from-orange-500 via-orange-600 to-gray-600 bg-clip-text text-transparent drop-shadow-lg">
                         404
                     </h1>
                     {/* Glowing effect behind text */}
-                    <div className="absolute inset-0 text-8xl md:text-9xl font-black text-[#1a67fe] opacity-20 blur-sm">
+                    <div className="absolute inset-0 text-8xl md:text-9xl font-black text-orange-500 opacity-20 blur-sm">
                         404
                     </div>
                 </div>
 
-                {/* Error message */}
-                <div className="space-y-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-slate-800 flex items-center justify-center gap-3">
-                        <span className="text-4xl">🔍</span>
-                        Page Not Found
-                    </h2>
-                    <p className="text-lg md:text-xl text-slate-600 max-w-md mx-auto leading-relaxed">
-                        Oops! The page you&apos;re looking for seems to have wandered off into the digital void.
-                    </p>
+                {/* Locker Animation */}
+                <div className="relative py-8">
+                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
+                        <h3 className="text-lg font-semibold text-gray-700 mb-6">Locker Access Denied</h3>
+                        
+                        {/* Locker Grid */}
+                        <div className="grid grid-cols-6 gap-4 justify-center max-w-md mx-auto mb-6">
+                            {Object.entries(lockerStates).map(([id, state]) => (
+                                <LockerUnit 
+                                    key={id}
+                                    id={id}
+                                    isOpen={state.isOpen}
+                                    delay={state.animationDelay}
+                                />
+                            ))}
+                        </div>
 
-                </div>
-
-                {/* Action button */}
-                <div className="pt-4">
-                    <Button 
-                        onClick={goHome} 
-                        className="group relative px-8 py-4 bg-gradient-to-r from-[#1a67fe] to-blue-600 hover:from-blue-600 hover:to-[#1a67fe] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 border-0"
-                    >
-                        <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            Back To Home
-                        </span>
-                        {/* Button glow effect */}
-                        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#1a67fe] to-blue-600 opacity-0 group-hover:opacity-20 blur transition-opacity duration-300"></div>
-                    </Button>
-                </div>
-
-                {/* Custom 404 Illustration */}
-                <div className="pt-8">
-                    <div className="relative group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#1a67fe] to-blue-600 rounded-2xl opacity-10 group-hover:opacity-20 transition-opacity duration-300 blur-sm"></div>
-                        <div className="relative bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
-                            {/* Custom SVG Illustration */}
-                            <div className="w-full max-w-md mx-auto">
-                                <svg viewBox="0 0 400 300" className="w-full h-auto">
-                                    {/* Background elements */}
-                                    <defs>
-                                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#1a67fe" stopOpacity="0.1"/>
-                                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.2"/>
-                                        </linearGradient>
-                                        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stopColor="#1a67fe"/>
-                                            <stop offset="100%" stopColor="#3b82f6"/>
-                                        </linearGradient>
-                                    </defs>
-                                    
-                                    {/* Floating geometric shapes */}
-                                    <circle cx="80" cy="80" r="30" fill="url(#grad1)" className="animate-pulse">
-                                        <animateTransform attributeName="transform" type="translate" values="0,0; 10,5; 0,0" dur="4s" repeatCount="indefinite"/>
-                                    </circle>
-                                    <polygon points="320,60 340,40 360,60 340,80" fill="url(#grad1)" className="animate-pulse">
-                                        <animateTransform attributeName="transform" type="translate" values="0,0; -5,10; 0,0" dur="3s" repeatCount="indefinite"/>
-                                    </polygon>
-                                    <rect x="50" y="200" width="25" height="25" fill="url(#grad1)" className="animate-pulse" transform="rotate(45 62.5 212.5)">
-                                        <animateTransform attributeName="transform" type="translate" values="0,0; 8,-8; 0,0" dur="5s" repeatCount="indefinite"/>
-                                    </rect>
-                                    
-                                    {/* Main illustration - Broken link/chain */}
-                                    <g className="group-hover:scale-105 transition-transform duration-300">
-                                        {/* Left chain link */}
-                                        <ellipse cx="150" cy="150" rx="25" ry="15" fill="none" stroke="url(#grad2)" strokeWidth="6" transform="rotate(-30 150 150)"/>
-                                        
-                                        {/* Right chain link */}
-                                        <ellipse cx="250" cy="150" rx="25" ry="15" fill="none" stroke="url(#grad2)" strokeWidth="6" transform="rotate(30 250 150)"/>
-                                        
-                                        {/* Broken pieces */}
-                                        <path d="M 190 140 Q 200 135 210 140" fill="none" stroke="url(#grad2)" strokeWidth="4" strokeLinecap="round">
-                                            <animateTransform attributeName="transform" type="translate" values="0,0; 2,3; 0,0" dur="2s" repeatCount="indefinite"/>
-                                        </path>
-                                        <path d="M 190 160 Q 200 165 210 160" fill="none" stroke="url(#grad2)" strokeWidth="4" strokeLinecap="round">
-                                            <animateTransform attributeName="transform" type="translate" values="0,0; -2,-3; 0,0" dur="2s" repeatCount="indefinite"/>
-                                        </path>
-                                        
-                                        {/* Spark effects */}
-                                        <circle cx="190" cy="145" r="2" fill="#1a67fe" className="animate-ping"/>
-                                        <circle cx="210" cy="155" r="2" fill="#3b82f6" className="animate-ping" style={{animationDelay: '0.5s'}}/>
-                                        <circle cx="200" cy="140" r="1.5" fill="#1a67fe" className="animate-ping" style={{animationDelay: '1s'}}/>
-                                    </g>
-                                    
-                                    {/* Floating question marks */}
-                                    <text x="120" y="100" fontSize="20" fill="url(#grad2)" className="animate-bounce" style={{animationDelay: '1s'}}>?</text>
-                                    <text x="280" y="120" fontSize="16" fill="url(#grad2)" className="animate-bounce" style={{animationDelay: '2s'}}>?</text>
-                                    <text x="160" y="220" fontSize="18" fill="url(#grad2)" className="animate-bounce" style={{animationDelay: '0.5s'}}>?</text>
-                                    
-                                    {/* Bottom wavy line */}
-                                    <path d="M 50 250 Q 100 240 150 250 T 250 250 T 350 250" fill="none" stroke="url(#grad2)" strokeWidth="3" strokeLinecap="round" opacity="0.6">
-                                        <animate attributeName="d" 
-                                            values="M 50 250 Q 100 240 150 250 T 250 250 T 350 250;
-                                                    M 50 250 Q 100 260 150 250 T 250 250 T 350 250;
-                                                    M 50 250 Q 100 240 150 250 T 250 250 T 350 250" 
-                                            dur="3s" repeatCount="indefinite"/>
-                                    </path>
-                                </svg>
+                        {/* Access panel */}
+                        <div className="bg-gray-800 rounded-lg p-4 max-w-xs mx-auto">
+                            <div className="text-center mb-3">
+                                <div className="w-12 h-8 bg-red-500 rounded mx-auto mb-2 flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold">ERROR</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1">
+                                    {[...Array(9)].map((_, i) => (
+                                        <div 
+                                            key={i} 
+                                            className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center text-white text-sm hover:bg-orange-500 transition-colors cursor-pointer"
+                                        >
+                                            {i + 1}
+                                        </div>
+                                    ))}
+                                    <div className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center text-white text-sm">*</div>
+                                    <div className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center text-white text-sm">0</div>
+                                    <div className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center text-white text-sm">#</div>
+                                </div>
                             </div>
-                            
-                            {/* Additional decorative elements */}
-                            <div className="flex justify-center mt-6 space-x-4">
-                                <div className="w-3 h-3 bg-[#1a67fe] rounded-full animate-pulse"></div>
-                                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                                <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
+                        </div>
+
+                        {/* Status indicators */}
+                        <div className="flex justify-center mt-6 space-x-6 text-sm">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-gray-600">System Online</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                                <span className="text-gray-600">Access Denied</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* Error message */}
+                <div className="space-y-4">
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center justify-center gap-3">
+                        <Lock className="text-orange-500" />
+                        Locker Not Found
+                    </h2>
+                    <p className="text-lg md:text-xl text-gray-600 max-w-md mx-auto leading-relaxed">
+                        The locker you're looking for seems to be locked away in our digital vault. Let's get you back to the main storage area!
+                    </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                    <button 
+                        onClick={goHome} 
+                        disabled={isLoading}
+                        className={`group relative px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 border-0 ${
+                            isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            {isLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    Loading...
+                                </>
+                            ) : (
+                                <>
+                                    <Home className="w-5 h-5" />
+                                    Return to Dashboard
+                                    {userRole && (
+                                        <span className="text-xs bg-white/20 px-2 py-1 rounded-full ml-1">
+                                            {userRole}
+                                        </span>
+                                    )}
+                                </>
+                            )}
+                        </span>
+                        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 opacity-0 group-hover:opacity-20 blur transition-opacity duration-300"></div>
+                    </button>
+
+                    <button 
+                        onClick={goBack} 
+                        className="group relative px-8 py-4 bg-white border-2 border-gray-300 hover:border-orange-500 text-gray-700 hover:text-orange-600 font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                    >
+                        <span className="flex items-center gap-2">
+                            <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
+                            Go Back
+                        </span>
+                    </button>
+                </div>
+
                 {/* Additional helpful links */}
                 <div className="pt-6 flex flex-wrap justify-center gap-4 text-sm">
-                    <button 
-                        onClick={() => router.back()} 
-                        className="text-[#1a67fe] hover:text-blue-600 font-medium transition-colors duration-200 hover:underline"
-                    >
-                        ← Go Back
-                    </button>
-                    <span className="text-slate-400">•</span>
-                    <button 
-                        onClick={() => router.push('/help')} 
-                        className="text-[#1a67fe] hover:text-blue-600 font-medium transition-colors duration-200 hover:underline"
-                    >
+                    <button className="text-orange-500 hover:text-orange-600 font-medium transition-colors duration-200 hover:underline flex items-center gap-1">
+                        <HelpCircle className="w-4 h-4" />
                         Get Help
                     </button>
-                    <span className="text-slate-400">•</span>
-                    <button 
-                        onClick={() => router.push('/contact')} 
-                        className="text-[#1a67fe] hover:text-blue-600 font-medium transition-colors duration-200 hover:underline"
-                    >
+                    <span className="text-gray-400">•</span>
+                    <button className="text-orange-500 hover:text-orange-600 font-medium transition-colors duration-200 hover:underline flex items-center gap-1">
+                        <MessageCircle className="w-4 h-4" />
                         Contact Support
                     </button>
                 </div>
@@ -195,15 +306,26 @@ export default function NotFound() {
                     {particles.map((particle) => (
                         <div
                             key={particle.id}
-                            className="absolute w-2 h-2 bg-[#1a67fe] rounded-full opacity-20 animate-bounce"
+                            className="absolute w-2 h-2 bg-orange-500 rounded-full opacity-20 animate-bounce"
                             style={{
                                 left: `${particle.left}%`,
                                 top: `${particle.top}%`,
                                 animationDelay: `${particle.delay}s`,
                                 animationDuration: `${particle.duration}s`
                             }}
-                        ></div>
+                        />
                     ))}
+                </div>
+            )}
+
+            {/* Floating keys animation */}
+            {isClient && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <Key className="absolute top-20 left-10 w-6 h-6 text-orange-300 opacity-30 animate-bounce" style={{animationDelay: '0.5s'}} />
+                    <Key className="absolute top-40 right-20 w-4 h-4 text-gray-400 opacity-40 animate-bounce" style={{animationDelay: '1.5s'}} />
+                    <Key className="absolute bottom-32 left-1/3 w-5 h-5 text-orange-400 opacity-25 animate-bounce" style={{animationDelay: '2.5s'}} />
+                    <Lock className="absolute top-60 right-10 w-4 h-4 text-gray-500 opacity-30 animate-pulse" />
+                    <Lock className="absolute bottom-20 right-1/4 w-6 h-6 text-orange-300 opacity-20 animate-pulse" style={{animationDelay: '1s'}} />
                 </div>
             )}
         </div>
