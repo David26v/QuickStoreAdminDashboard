@@ -23,17 +23,9 @@ import {
 import { useRouter } from 'next/navigation'; 
 import supabase from '@/lib/helper';
 import AddLockerModal from './components/AddLockerModal';
+import { getStatusColorDevice ,getStatusBgColorDevice ,getStatusLightColorDevice} from '@/lib/utils';
+import { statusOptions } from './data/statusOption';
 
-const statusOptions = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'under_maintenance', label: 'Under Maintenance' },
-  { value: 'no_device_yet', label: 'No Device Yet' },
-  { value: 'available', label: 'Available' },
-  { value: 'onsite', label: 'Onsite' },
-  { value: 'in_warehouse', label: 'In Warehouse' },
-  { value: 'arriving_to_client', label: 'Arriving to Client' },
-  { value: 'received_by_client', label: 'Received by Client' },
-];
 
 const LockerInventory = () => {
   const router = useRouter();
@@ -61,11 +53,9 @@ const LockerInventory = () => {
       .from('lockers')
       .select(`
         id,
-        locker_number,
+        name,
         status,
         client_id,
-        assigned_to, 
-        assigned_at,
         released_at,
         created_at,
         updated_at,
@@ -97,7 +87,7 @@ const LockerInventory = () => {
 
     const formattedLockers = lockersData.map(locker => {
       const device = devicesData.find(dev => dev.locker_id === locker.id); 
-      
+
       return {
         id: locker.id,
         locker_number: locker.locker_number,
@@ -122,11 +112,12 @@ const LockerInventory = () => {
 
     setLockers(formattedLockers);
     setFilteredLockers(formattedLockers);
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("Error fetching lockers:", error);
-    // Provide a user-friendly error message
     setError(error.message || "An error occurred while fetching locker data. Please try again.");
-  } finally {
+  } 
+  finally {
     setLoading(false);
   }
 };
@@ -135,11 +126,10 @@ const LockerInventory = () => {
   useEffect(() => {
     let result = lockers;
 
-    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(locker =>
-        locker.locker_number.toString().includes(term) ||
+        locker.name.toString().includes(term) ||
         (locker.device_manufacturer && locker.device_manufacturer.toLowerCase().includes(term)) ||
         (locker.device_model && locker.device_model.toLowerCase().includes(term)) ||
         (locker.client_name && locker.client_name.toLowerCase().includes(term))
@@ -160,65 +150,20 @@ const LockerInventory = () => {
   }, [searchTerm, statusFilter, clientFilter, lockers]);
 
 
-  const statusOptions = [
-    { value: 'all', label: 'All Statuses' },
-    { value: 'under_maintenance', label: 'Under Maintenance' },
-    { value: 'no_device_yet', label: 'No Device Yet' },
-    { value: 'available', label: 'Available' },
-    { value: 'onsite', label: 'Onsite' },
-    { value: 'in_warehouse', label: 'In Warehouse' },
-    { value: 'arriving_to_client', label: 'Arriving to Client' },
-    { value: 'received_by_client', label: 'Received by Client' },
-  ];
 
   const getStatusText = (status) => {
     const option = statusOptions.find(opt => opt.value === status) || statusOptions.find(opt => opt.value === 'all');
     return option ? option.label : status;
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'available': return 'text-green-600 bg-green-100';
-      case 'no_device_yet': return 'text-purple-600 bg-purple-100';
-      case 'under_maintenance': return 'text-yellow-600 bg-yellow-100';
-      case 'onsite': return 'text-indigo-600 bg-indigo-100';
-      case 'in_warehouse': return 'text-gray-600 bg-gray-100';
-      case 'arriving_to_client': return 'text-orange-600 bg-orange-100';
-      case 'received_by_client': return 'text-blue-600 bg-blue-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getStatusBgColor = (status) => {
-    switch (status) {
-      case 'available': return 'bg-green-50';
-      case 'no_device_yet': return 'bg-purple-50';
-      case 'under_maintenance': return 'bg-yellow-50';
-      case 'onsite': return 'bg-indigo-50';
-      case 'in_warehouse': return 'bg-gray-50';
-      case 'arriving_to_client': return 'bg-orange-50';
-      case 'received_by_client': return 'bg-blue-50';
-      default: return 'bg-gray-50';
-    }
-  };
+  
 
   const getStatusIcon = (status) => {
     const option = statusOptions.find(opt => opt.value === status);
     return option ? option.icon : <Package className="w-5 h-5 text-gray-600" />;
   };
 
-  const getStatusLightColor = (status) => {
-    switch (status) {
-      case 'available': return 'bg-green-500 shadow-[0_0_8px_2px_rgba(72,187,120,0.5)]';
-      case 'no_device_yet':
-      case 'received_by_client': return 'bg-blue-500 shadow-[0_0_8px_2px_rgba(59,130,246,0.5)]';
-      case 'under_maintenance': return 'bg-yellow-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]';
-      case 'onsite': return 'bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.5)]';
-      case 'in_warehouse': return 'bg-gray-500 shadow-[0_0_8px_2px_rgba(107,114,128,0.5)]';
-      case 'arriving_to_client': return 'bg-orange-500 shadow-[0_0_8px_2px_rgba(249,115,22,0.5)]';
-      default: return 'bg-gray-400';
-    }
-  };
+
 
   const getDoorVisual = (status) => {
     switch (status) {
@@ -244,32 +189,27 @@ const LockerInventory = () => {
   const isReadyForDispatch = (status) => {
     return status === 'available' || status === 'no_device_yet' || status === 'in_warehouse';
   };
-// --- End Helper Functions ---
 
 
 
   const handleAssignDevice = async (lockerId) => {
-    console.log(`Assign device to locker ${lockerId}`);
 
     alert(`Assign device flow for locker ${lockerId} - To be implemented`);
-    // Example: router.push(`/admin/locker-management/assign/${lockerId}`);
   };
 
   const handleUnassignDevice = async (lockerId) => {
     console.log(`Unassign device from locker ${lockerId}`);
     try {
       const { error } = await supabase
-        .from('lockers') // Or 'locker_doors' if that's where device_id is
+        .from('lockers') 
         .update({
-          device_id: null, // Or set appropriate status
-          status: 'available' // Or 'no_device_yet' depending on logic
+          device_id: null, 
+          status: true
         })
         .eq('id', lockerId);
 
       if (error) throw error;
 
-      console.log("Device unassigned successfully");
-      // Refresh the list
       fetchLockers();
     } catch (error) {
       console.error("Error unassigning device:", error);
@@ -278,9 +218,7 @@ const LockerInventory = () => {
   };
 
   const handleViewDetails = (lockerId) => {
-    console.log(`View details for locker ${lockerId}`);
-    alert(`View details for locker ${lockerId} - To be implemented`);
-    // Example: router.push(`/admin/locker-management/details/${lockerId}`);
+    router.push(`/admin/locker-management/inventory/${lockerId}`);
   };
 
   const handleAddLockerModalOpen = () => {
@@ -295,7 +233,6 @@ const LockerInventory = () => {
     fetchLockers();
   };
 
-  // --- Render ---
   if (loading) {
     return (
       <div className="p-6 min-h-screen flex items-center justify-center">
@@ -322,7 +259,6 @@ const LockerInventory = () => {
     );
   }
 
-  // Derive unique clients from the fetched data
   const uniqueClients = [...new Set(lockers.map(l => l.client_name).filter(Boolean))];
 
   return (
@@ -430,14 +366,14 @@ const LockerInventory = () => {
         {filteredLockers.length > 0 ? (
           filteredLockers.map((locker) => {
             const doorVisual = getDoorVisual(locker.status);
-            const statusLightColor = getStatusLightColor(locker.status);
+            const statusLightColor = getStatusLightColorDevice(locker.status);
             const readyForDispatch = isReadyForDispatch(locker.status);
             return (
               <div
                 key={locker.id}
                 className={`
                 relative rounded-2xl shadow-lg overflow-hidden transition-all duration-300
-                ${getStatusBgColor(locker.status)} hover:shadow-xl
+                ${getStatusBgColorDevice(locker.status)} hover:shadow-xl
                 border-2 ${locker.status === 'available' ? 'border-green-200' :
                     locker.status === 'received_by_client' ? 'border-blue-200' :
                       locker.status === 'under_maintenance' ? 'border-yellow-200' :
@@ -451,10 +387,10 @@ const LockerInventory = () => {
                 <div className="p-5 pb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-800">#{locker.locker_number}</h3>
+                      <h3 className="text-2xl font-bold text-gray-800">{'No name' || locker.name} </h3>
                       <div className="flex items-center mt-1">
                         {getStatusIcon(locker.status)}
-                        <span className={`ml-2 text-sm font-medium ${getStatusColor(locker.status).split(' ')[1]}`}>
+                        <span className={`ml-2 text-sm font-medium ${getStatusColorDevice(locker.status).split(' ')[1]}`}>
                           {getStatusText(locker.status)}
                         </span>
                       </div>

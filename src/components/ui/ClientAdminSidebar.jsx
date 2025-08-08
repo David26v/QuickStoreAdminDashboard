@@ -16,7 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
-  Building2, // Fallback icon for ClientAvatar
+  Building2, 
   UserCheck,
   TrendingUp,
   Shield,
@@ -42,8 +42,9 @@ import {
   LocateIcon,
   Settings2Icon,
   UserPlus,
-  Wifi,      // For online indicator
-  WifiOff    // For offline indicator
+  Wifi,      
+  WifiOff,    
+  MonitorPlayIcon
 } from "lucide-react";
 import { useLoading } from "../providers/LoadingProvider";
 import Image from 'next/image';
@@ -66,7 +67,7 @@ const ClientAvatar = ({ src, alt, sizeClass = "w-12 h-12" }) => {
       <Image
         src={src}
         alt={alt || "Client Avatar"}
-        fill // Fill the parent container
+        fill 
         sizes="(max-width: 768px) 40px, 48px"
         style={{ objectFit: 'cover' }} 
         className="rounded-xl"
@@ -110,18 +111,19 @@ const AdminSidebar = ({ isOpen, role, clientData }) => {
     }));
   };
 
-  // --- Updated Styles to match QuickStore theme ---
   const activeStyle = "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg transform scale-105";
   const inactiveStyle = "text-gray-600 hover:text-gray-800";
   const groupStyle = "text-gray-700 hover:bg-gray-100";
-  // --- End Updated Styles ---
+
+
 
   const client_admin_menu = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/client_admin/dashboard", type: "single" },
 
     {
       label: "Locker Management", icon: Lock, type: "group", children: [
-        { label: "My Lockers", icon: UserCog, path: "/client_admin/locker-management/my-locker" },
+        { label: "Doors Assignment", icon: UserCog, path: "/client_admin/locker-management/doors-assignment" },
+        { label: "Real Time Doors Usage", icon: MonitorPlayIcon, path: "/client_admin/locker-management/live-monitoring" },
         { label: "Locker Session History", icon: FileClock, type: "single", path: "/client_admin/locker-management/history" },
         { label: "Lockers Settings", icon: Settings2Icon, type: "single", path: "/client_admin/locker-management/settings" },
       ]
@@ -134,17 +136,10 @@ const AdminSidebar = ({ isOpen, role, clientData }) => {
         { label: "Members", icon: Briefcase, path: "/client_admin/user-management/employees" },
       ]
     },
-    {
-      label: "System Settings", icon: Settings2, type: "group", children: [
-        { label: "General Settings", icon: Settings, path: "/client_admin/system-settings/general" },
-        { label: "Integrations", icon: Plug, path: "/client_admin/system-settings/integrations" },
-        { label: "Backup & Restore", icon: DatabaseBackup, path: "/client_admin/system-settings/backup" },
-      ]
-    },
-    { label: "Profile Settings", icon: Settings, path: "/admin/profile", type: "single" },
+  
+    { label: "Profile Settings", icon: Settings, path: "/client_admin/profile", type: "single" },
 
   ];
-  // --- END UPDATED ADMIN SIDEBAR ---
   const sidebarItems = role === "client_admin" ? client_admin_menu : [];
 
   const renderMenuItem = (item) => {

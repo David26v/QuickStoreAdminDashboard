@@ -14,12 +14,14 @@ import {
   Eye,
   Hand,
   CreditCard,
+  Tag,
 } from 'lucide-react';
 import supabase from "@/lib/helper";
 import { FormModal } from '@/components/ui/ModalQuickStore';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const AddClientModal = ({
   isOpen,
@@ -37,7 +39,7 @@ const AddClientModal = ({
     notes: editClient?.notes || '',
   });
 
-  const [clientSettingsId, setClientSettingsId] = useState(null); // ID of the settings record
+  const [clientSettingsId, setClientSettingsId] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [availableLockers, setAvailableLockers] = useState([]);
@@ -45,29 +47,43 @@ const AddClientModal = ({
   const [initialAssignedLockerIds, setInitialAssignedLockerIds] = useState([]);
 
   // --- Updated State for Auth Methods ---
-  const [availableAuthMethods, setAvailableAuthMethods] = useState([]); // Fetched from auth_methods table
-  const [selectedAuthMethodIds, setSelectedAuthMethodIds] = useState([]); // Stores IDs from auth_methods
-  const [initialSelectedAuthMethodIds, setInitialSelectedAuthMethodIds] = useState([]); // For tracking changes on edit
+  const [availableAuthMethods, setAvailableAuthMethods] = useState([]); 
+  const [selectedAuthMethodIds, setSelectedAuthMethodIds] = useState([]); 
+  const [initialSelectedAuthMethodIds, setInitialSelectedAuthMethodIds] = useState([]); 
+  const [client_type, setClientTypes] = useState([]); 
 
-  // --- Fetch Available Auth Methods and Client Data ---
-  useEffect(() => {
+ useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
       if (isOpen) {
         setLoading(true);
         setErrors({});
         try {
-          // 1. Fetch available authentication methods
           const { data: authMethodsData, error: authMethodsError } = await supabase
             .from('auth_methods')
-            .select('id, name, technical_name') // Fetch id and name for display/selection
-            .eq('is_active', true); // Only fetch active methods
+            .select('id, name, technical_name')
+            .eq('is_active', true);
+
           if (authMethodsError) throw authMethodsError;
+
           if (isMounted) {
             setAvailableAuthMethods(authMethodsData || []);
           }
 
-          // 2. Fetch available lockers
+          // 2. Fetch available client types
+          const { data: clientTypesData, error: clientTypesError } = await supabase
+            .from('client_types')
+            .select('id, name');
+
+          if (clientTypesError) throw clientTypesError;
+
+          if (isMounted) {
+            setClientTypes(clientTypesData || []);
+          }
+
+          console.log('clientTypesData',clientTypesData)
+
+          // 3. Fetch available lockers
           const { data: lockersData, error: lockersError } = await supabase
             .from('lockers')
             .select('id, locker_number, client_id');
@@ -80,7 +96,7 @@ const AddClientModal = ({
             // --- Fetch Client Settings ID ---
             const { data: settingsData, error: settingsError } = await supabase
               .from('client_locker_settings')
-              .select('id') // Only need the ID now
+              .select('id')
               .eq('client_id', editClient.id)
               .single();
             if (settingsError && settingsError.code !== 'PGRST116') {
@@ -91,33 +107,27 @@ const AddClientModal = ({
             }
 
             // --- Fetch Assigned Auth Method IDs ---
-            // Requires clientSettingsId to be fetched first, or fetch settings ID again here
             let settingsIdForAuth = null;
             if (settingsData) {
                 settingsIdForAuth = settingsData.id;
             } else {
-                // If no settings record exists yet, there are no auth methods assigned
                 if (isMounted) {
                     setSelectedAuthMethodIds([]);
                     setInitialSelectedAuthMethodIds([]);
                 }
             }
-
             if (settingsIdForAuth) {
                 const { data: clientAuthMethodsData, error: clientAuthMethodsError } = await supabase
                 .from('client_auth_methods')
                 .select('auth_method_id')
                 .eq('client_setting_id', settingsIdForAuth);
-
                 if (clientAuthMethodsError) throw clientAuthMethodsError;
-
                 const assignedMethodIds = clientAuthMethodsData?.map(item => item.auth_method_id) || [];
                 if (isMounted) {
                     setSelectedAuthMethodIds(assignedMethodIds);
                     setInitialSelectedAuthMethodIds(assignedMethodIds);
                 }
             }
-
 
             // --- Fetch Initially Assigned Lockers ---
             const initiallyAssigned = lockersData
@@ -132,7 +142,7 @@ const AddClientModal = ({
             if (isMounted) {
               setAssignedLockerIds([]);
               setInitialAssignedLockerIds([]);
-              setSelectedAuthMethodIds([]); // Reset selected auth method IDs
+              setSelectedAuthMethodIds([]);
               setInitialSelectedAuthMethodIds([]);
               setClientSettingsId(null);
             }
@@ -152,8 +162,7 @@ const AddClientModal = ({
     fetchData();
     return () => { isMounted = false; };
   }, [isOpen, isEditMode, editClient?.id]);
-
-  // Validation function
+  
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) {
@@ -176,18 +185,33 @@ const AddClientModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+const handleChange = (eOrName, maybeValue) => {
+  if (typeof eOrName === 'object' && eOrName.target) {
+    const { name, value } = eOrName.target;
+
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    // Clear specific field error if it existed
+
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-  };
+  } 
+  else {
+    const name = eOrName;
+    const value = maybeValue;
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  }
+};
 
   
   const handleAuthMethodToggle = (methodId) => {
@@ -214,7 +238,8 @@ const AddClientModal = ({
     });
   };
 
-  const handleSubmit = async (e) => {
+
+   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
       return;
@@ -223,8 +248,7 @@ const AddClientModal = ({
     try {
       let clientData;
       let clientId;
-      let settingsIdToUse = clientSettingsId; 
-
+      let settingsIdToUse = clientSettingsId;
       // --- 1. Insert/Update Client ---
       if (isEditMode) {
         const { data, error: clientError } = await supabase
@@ -236,6 +260,7 @@ const AddClientModal = ({
             email: formData.email.trim() || null,
             phone: formData.phone.trim() || null,
             notes: formData.notes.trim() || null,
+            client_type_id: formData.client_type_id || null, 
             updated_at: new Date().toISOString()
           })
           .eq('id', editClient.id)
@@ -253,7 +278,8 @@ const AddClientModal = ({
             contact_person: formData.contact_person.trim() || null,
             email: formData.email.trim() || null,
             phone: formData.phone.trim() || null,
-            notes: formData.notes.trim() || null
+            notes: formData.notes.trim() || null,
+            client_type_id: formData.client_type_id || null 
           }])
           .select()
           .single();
@@ -262,17 +288,14 @@ const AddClientModal = ({
         clientId = data.id;
       }
 
-     
       const { data: upsertedSettingsData, error: upsertSettingsError } = await supabase
         .from('client_locker_settings')
-        .upsert({ client_id: clientId }, { onConflict: 'client_id' }) 
-        .select('id') 
+        .upsert({ client_id: clientId }, { onConflict: 'client_id' })
+        .select('id')
         .single();
-
       if (upsertSettingsError) throw upsertSettingsError;
-      settingsIdToUse = upsertedSettingsData.id; 
+      settingsIdToUse = upsertedSettingsData.id;
 
-     
       const methodsToAdd = selectedAuthMethodIds.filter(id => !initialSelectedAuthMethodIds.includes(id));
       const methodsToRemove = initialSelectedAuthMethodIds.filter(id => !selectedAuthMethodIds.includes(id));
 
@@ -293,15 +316,13 @@ const AddClientModal = ({
           .select('id')
           .eq('client_setting_id', settingsIdToUse)
           .in('auth_method_id', methodsToRemove);
-
         if (fetchDeleteError) throw fetchDeleteError;
-
         const recordIdsToDelete = recordsToDelete?.map(record => record.id) || [];
         if (recordIdsToDelete.length > 0) {
             const { error: deleteAuthError } = await supabase
               .from('client_auth_methods')
               .delete()
-              .in('id', recordIdsToDelete); 
+              .in('id', recordIdsToDelete);
              if (deleteAuthError) throw deleteAuthError;
         }
       }
@@ -325,6 +346,7 @@ const AddClientModal = ({
         if (unassignError) throw unassignError;
       }
 
+      
       setFormData({
         name: '',
         location: '',
@@ -332,15 +354,17 @@ const AddClientModal = ({
         email: '',
         phone: '',
         notes: '',
+        client_type_id: '', 
       });
       setAssignedLockerIds([]);
       setInitialAssignedLockerIds([]);
-      setSelectedAuthMethodIds([]); 
+      setSelectedAuthMethodIds([]);
       setInitialSelectedAuthMethodIds([]);
       setClientSettingsId(null);
       setErrors({});
-      onClientAdded?.(clientData);
-      onClose();
+
+      onClientAdded?.(clientData); 
+      onClose(); 
     } catch (error) {
       console.error('Error saving client/settings/lockers/auth:', error);
       setErrors({ submit: error.message || 'An unexpected error occurred. Please try again.' });
@@ -349,7 +373,8 @@ const AddClientModal = ({
     }
   };
 
-  const handleClose = () => {
+
+ const handleClose = () => {
     if (!loading) {
       setFormData({
         name: '',
@@ -358,10 +383,11 @@ const AddClientModal = ({
         email: '',
         phone: '',
         notes: '',
+        client_type_id: '', 
       });
       setAssignedLockerIds([]);
       setInitialAssignedLockerIds([]);
-      setSelectedAuthMethodIds([]); 
+      setSelectedAuthMethodIds([]);
       setInitialSelectedAuthMethodIds([]);
       setClientSettingsId(null);
       setErrors({});
@@ -392,6 +418,7 @@ const AddClientModal = ({
             </div>
           </div>
         )}
+
         {/* Basic Information Section */}
         <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4">
           <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
@@ -443,6 +470,49 @@ const AddClientModal = ({
               )}
             </div>
           </div>
+
+         <div className="md:col-span-2">
+          <Label
+            htmlFor="client_type_id"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Client Type
+          </Label>
+          <div className="relative">
+            <Select
+              value={formData.client_type_id}
+              onValueChange={(value) => handleChange('client_type_id', value)}
+              disabled={loading}
+            >
+              <SelectTrigger
+                className={`w-full pl-10 ${errors.client_type_id ? 'border-red-500 focus:ring-red-500/20' : ''}`}
+              >
+                <SelectValue placeholder="Select a client type" />
+              </SelectTrigger>
+              <SelectContent>
+                {client_type.length > 0 ? (
+                  client_type.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="__no_client_types__" disabled>
+                    No client types available
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+          {errors.client_type_id && (
+            <p className="text-red-600 text-sm mt-1 flex items-center space-x-1">
+              <AlertCircle className="w-4 h-4" />
+              <span>{errors.client_type_id}</span>
+            </p>
+          )}
+        </div>
+
         </div>
 
         {/* --- New Section: Locker Access Settings --- */}
@@ -528,7 +598,8 @@ const AddClientModal = ({
               )}
               <p className="text-xs text-gray-500 mt-2">These settings will determine how users authenticate to access lockers assigned to this client.</p>
             </div>
-            {/* --- End Multi-Select Authentication Methods --- */}
+              
+              
 
             {/* Locker Assignment */}
             <div>
@@ -693,6 +764,7 @@ const AddClientModal = ({
               <ul className="text-sm text-blue-700 mt-1 space-y-1">
                 <li>• Fields marked with * are required</li>
                 <li>• Client information can be updated later if needed</li>
+                <li>• Client Type information can be updated later if needed</li>
                 <li>• Select multiple authentication methods for flexible access.</li>
                 <li>• Lockers can be assigned to this client now or later.</li>
               </ul>

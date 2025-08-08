@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { 
   Building2, 
   MapPin, 
@@ -20,8 +20,9 @@ import supabase from "@/lib/helper";
 import { Input, SearchInput } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { QuickStoreLoadingCompact } from '@/components/ui/QuickStoreLoading';
-import AddClientModal from './components/AddClientModal';
+import AddClientModal from '../components/AddClientModal';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@/components/providers/UserContext';
 
 
 
@@ -33,12 +34,18 @@ const ClientPage = () => {
   const [filteredClients, setFilteredClients] = useState([]);
   const [openModal,setOpenModal] = useState(false); 
   const [editingClient, setEditingClient] = useState(null);
+  const [client_type, setClientType] = useState(null); 
   const router = useRouter()
 
   
   useEffect(() => {
     fetchClients();
   }, []);
+
+
+  useEffect(() =>{
+    
+  }, [clients])
 
   useEffect(() => {
     const filtered = clients.filter(client =>
@@ -59,7 +66,6 @@ const ClientPage = () => {
         `)
         .order('created_at', { ascending: false });
 
-        console.log('fetch data clients:' , data)
 
       if (error) {
         console.error('Error fetching clients:', error);
@@ -82,9 +88,12 @@ const ClientPage = () => {
     });
   };
 
+
   const handleAction = (action, client) => {
     console.log(`${action} action for client:`, client);
   };
+
+
 
 
 
@@ -259,7 +268,7 @@ const ClientPage = () => {
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center space-x-2">
                           <button 
-                            onClick={() => router.push(`/admin/clients/${client.id}`)}
+                            onClick={() => router.push(`/admin/clients/clientlist/${client.id}`)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-150"
                             title="View"
                           >
@@ -326,7 +335,7 @@ const ClientPage = () => {
 
                     <div className="flex items-center space-x-2 pt-4 border-t border-gray-100">
                       <button 
-                        onClick={() => router.push(`/admin/clients/${client.id}`)}
+                        onClick={() => router.push(`/admin/clients/clientlist/${client.id}`)}
                         className="flex-1 bg-blue-50 text-blue-600 py-2 px-3 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors duration-150 flex items-center justify-center space-x-1"
                       >
                         <Eye className="w-4 h-4" />

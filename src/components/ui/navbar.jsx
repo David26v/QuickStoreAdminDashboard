@@ -6,17 +6,15 @@ import { Input } from "@/components/ui/input";
 // FiSun, FiMoon were imported but not used, removed
 import Image from "next/image";
 import UserAvatarMenu from "./UserAvatarMenu";
-import ZentryNotificationDemo from "./notificationBell"; // Ensure this path is correct
-import supabase from "@/lib/helper"; // Ensure this path is correct
+import ZentryNotificationDemo from "./notificationBell"; 
+import supabase from "@/lib/helper"; 
 
-const Navbar = ({ openSideBar, user }) => { // Accepting user prop
+const Navbar = ({ openSideBar, user }) => { 
   const [open, setOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   
   const router = useRouter();
 
-  // --- Mock Notifications (for demo purposes) ---
-  // In a real app, these would likely come from an API or WebSocket
   const notifications = [
     {
       id: 1,
@@ -42,23 +40,13 @@ const Navbar = ({ openSideBar, user }) => { // Accepting user prop
   ];
 
   const unreadCount = notifications.filter(n => n.unread).length;
-  // --- End Mock Notifications ---
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-  
     if (error) {
       console.error("Logout error:", error.message);
-      // Optionally, display an error message to the user
       return;
     }
-  
-    // Clear any local storage items related to auth if needed
-    // (Supabase handles its own session cookies/tokens)
-    // localStorage.removeItem("authToken");
-    // localStorage.removeItem("username");
-  
-    // Redirect to login page
     router.push("/forms/login");
   };
 
@@ -102,12 +90,10 @@ const Navbar = ({ openSideBar, user }) => { // Accepting user prop
             {/* Divider */}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
 
-            {/* User Avatar Menu */}
-            {/* Passing the 'user' prop down, which contains first_name, last_name, avatar, etc. */}
             <UserAvatarMenu
               open={open}
               setOpen={setOpen}
-              user={user} // This is the key prop being passed
+              user={user}
               handleLogout={handleLogout}
               getInitials={(first, last) => `${first?.[0] ?? ''}${last?.[0] ?? ''}`}
             />

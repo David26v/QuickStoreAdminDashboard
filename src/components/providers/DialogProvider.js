@@ -1,5 +1,4 @@
 "use client";
-
 import React, { createContext, useState, useContext, useCallback } from "react";
 import {
   Dialog,
@@ -49,118 +48,117 @@ export function useDialog() {
   return useContext(DialogContext);
 }
 
-// Beautiful Animated Icon Component
+// Animated Icon Component with orange/slate theme
 const AnimatedIcon = ({ type, className = "" }) => {
   const iconProps = {
     size: 40,
     className: `${className} transition-all duration-500`
   };
-
+  
   const getIconConfig = () => {
     switch (type) {
       case "success":
         return {
           icon: <CheckCircle {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-green-400 to-green-600",
+          bgColor: "bg-gradient-to-br from-orange-500 to-orange-600",
           iconColor: "text-white",
           animation: "animate-bounceIn"
         };
       case "error":
         return {
           icon: <XCircle {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-red-400 to-red-600", 
+          bgColor: "bg-gradient-to-br from-red-500 to-red-600", 
           iconColor: "text-white",
           animation: "animate-shakeX"
         };
       case "warning":
         return {
           icon: <AlertCircle {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-yellow-400 to-orange-500",
+          bgColor: "bg-gradient-to-br from-yellow-500 to-orange-500",
           iconColor: "text-white", 
           animation: "animate-pulse"
         };
       case "info":
         return {
           icon: <Info {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-500 to-purple-600",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-pulse"
         };
       case "confirm":
         return {
           icon: <HelpCircle {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-600 to-purple-600",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-pulse"
         };
       case "sessionExpired":
         return {
           icon: <Clock {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-orange-400 to-orange-600",
+          bgColor: "bg-gradient-to-br from-orange-500 to-orange-600",
           iconColor: "text-white", 
           animation: "animate-spin"
         };
       case "delete":
         return {
           icon: <Trash2 {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-red-500 to-red-700",
+          bgColor: "bg-gradient-to-br from-red-500 to-red-600",
           iconColor: "text-white",
           animation: "animate-bounceIn"
         };
       case "logout":
         return {
           icon: <LogOut {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-orange-400 to-red-500",
+          bgColor: "bg-gradient-to-br from-orange-500 to-orange-600",
           iconColor: "text-white",
           animation: "animate-slideOut"
         };
       case "upload":
         return {
           icon: <Upload {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-500 to-cyan-500",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-bounceUp"
         };
       case "download":
         return {
           icon: <Download {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-600 to-purple-600",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white", 
           animation: "animate-bounceDown"
         };
       case "settings":
         return {
           icon: <Settings {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-slate-500 to-slate-700",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-spin"
         };
       case "profile":
         return {
           icon: <User {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-500 to-purple-600",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-pulse"
         };
       case "security":
         return {
           icon: <Shield {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-purple-500 to-purple-700",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: "animate-pulse"
         };
       default:
         return {
           icon: <Info {...iconProps} />,
-          bgColor: "bg-gradient-to-br from-blue-500 to-purple-600",
+          bgColor: "bg-gradient-to-br from-slate-600 to-slate-700",
           iconColor: "text-white",
           animation: ""
         };
     }
   };
-
+  
   const config = getIconConfig();
-
   return (
     <div className="flex justify-center items-center mb-6">
       <div className={`
@@ -192,7 +190,7 @@ export function DialogProvider({ children }) {
     onCancel: null,
     confirmText: "Confirm",
     cancelText: "Cancel",
-    variant: "default", // Changed from "rose" to match blue-purple theme
+    variant: "default",
   });
 
   const showConfirm = useCallback(({ 
@@ -378,7 +376,6 @@ export function DialogProvider({ children }) {
       warning: showWarning,
       info: showInfo,
     };
-    
     const method = alertMethods[type] || showInfo;
     method(message);
   }, [showSuccess, showError, showWarning, showInfo]);
@@ -419,33 +416,33 @@ export function DialogProvider({ children }) {
   const getTitleColor = () => {
     switch (dialog.type) {
       case "success":
-        return "text-green-600";
+        return "text-orange-600";
       case "error":
         return "text-red-600";
       case "warning":
         return "text-yellow-600";
       case "info":
-        return "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent";
+        return "text-slate-800";
       case "confirm":
-        return "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent";
+        return "text-slate-800";
       case "sessionExpired":
         return "text-orange-600";
       case "delete":
-        return "text-red-700";
+        return "text-red-600";
       case "logout":
-        return "text-orange-500";
+        return "text-orange-600";
       case "upload":
-        return "bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent";
+        return "text-slate-800";
       case "download":
-        return "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent";
+        return "text-slate-800";
       case "settings":
-        return "text-slate-700";
+        return "text-slate-800";
       case "profile":
-        return "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent";
+        return "text-slate-800";
       case "security":
-        return "bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent";
+        return "text-slate-800";
       default:
-        return "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent";
+        return "text-slate-800";
     }
   };
 
@@ -460,7 +457,7 @@ export function DialogProvider({ children }) {
       case "default":
         return "default";
       default:
-        return "default"; // Changed from "rose" to "default"
+        return "default";
     }
   };
 
@@ -496,12 +493,11 @@ export function DialogProvider({ children }) {
       }}
     >
       {children}
-
-      <Dialog open={dialog.open} onOpenChange={handleCancel} className='z-20'>
+      <Dialog open={dialog.open} onOpenChange={handleCancel}>
         <DialogContent className="sm:max-w-md overflow-hidden bg-white border shadow-2xl">
           <div className="relative">
-            {/* Background decoration - updated with blue-purple gradient */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 rounded-t-lg -mx-6 -mt-6"></div>
+            {/* Background decoration with orange/slate theme */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-br from-orange-50 via-orange-50 to-slate-100 rounded-t-lg -mx-6 -mt-6"></div>
             
             {/* Icon positioned better */}
             <div className="relative pt-4">
@@ -517,22 +513,22 @@ export function DialogProvider({ children }) {
                 {dialog.description}
               </DialogDescription>
             </DialogHeader>
-
-            {/* Beautiful button section */}
+            
+            {/* Button section with orange gradient */}
             <DialogFooter className="flex-col sm:flex-row gap-3 mt-8 pt-6 border-t border-gray-200">
               {needsConfirmation || hasCustomAction ? (
                 <>
                   <Button 
                     variant={getButtonVariant()} 
                     onClick={handleConfirm}
-                    className="w-full sm:w-auto min-w-[120px] font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+                    className="w-full sm:w-auto min-w-[120px] font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-0"
                   >
                     {dialog.confirmText}
                   </Button>
                   <Button 
                     variant="outline" 
                     onClick={handleCancel}
-                    className="w-full sm:w-auto min-w-[120px] font-medium hover:bg-gray-50 transition-all duration-200 hover:scale-105"
+                    className="w-full sm:w-auto min-w-[120px] font-medium hover:bg-gray-50 transition-all duration-200 hover:scale-105 border border-gray-300"
                   >
                     {dialog.cancelText}
                   </Button>
@@ -540,8 +536,7 @@ export function DialogProvider({ children }) {
               ) : (
                 <Button 
                   onClick={hideDialog} 
-                  variant="default"
-                  className="w-full sm:w-auto min-w-[120px] font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0"
+                  className="w-full sm:w-auto min-w-[120px] font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-0"
                 >
                   {dialog.confirmText}
                 </Button>
@@ -550,62 +545,50 @@ export function DialogProvider({ children }) {
           </div>
         </DialogContent>
       </Dialog>
-
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: scale(0.8); }
           to { opacity: 1; transform: scale(1); }
         }
-        
         @keyframes bounceIn {
           0% { transform: scale(0.3); opacity: 0; }
           50% { transform: scale(1.05); opacity: 0.8; }
           70% { transform: scale(0.9); opacity: 0.9; }
           100% { transform: scale(1); opacity: 1; }
         }
-        
         @keyframes shakeX {
           0%, 100% { transform: translateX(0); }
           10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
           20%, 40%, 60%, 80% { transform: translateX(3px); }
         }
-        
         @keyframes bounceUp {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-8px); }
         }
-        
         @keyframes bounceDown {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(8px); }
         }
-        
         @keyframes slideOut {
           0% { transform: translateX(0); opacity: 1; }
           50% { transform: translateX(10px); opacity: 0.7; }
           100% { transform: translateX(0); opacity: 1; }
         }
-        
         .animate-fadeIn {
           animation: fadeIn 0.4s ease-out;
         }
-        
         .animate-bounceIn {
           animation: bounceIn 0.6s ease-out;
         }
-        
         .animate-shakeX {
           animation: shakeX 0.8s ease-in-out;
         }
-        
         .animate-bounceUp {
           animation: bounceUp 1s ease-in-out infinite;
         }
-        
         .animate-bounceDown {
           animation: bounceDown 1s ease-in-out infinite;
         }
-        
         .animate-slideOut {
           animation: slideOut 2s ease-in-out infinite;
         }
