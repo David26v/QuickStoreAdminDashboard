@@ -1,5 +1,4 @@
 'use client'
-
 import React, { useState, useEffect } from 'react';
 import {
   Lock,
@@ -17,7 +16,6 @@ import {
   CheckCircle,
   TrendingUp
 } from 'lucide-react';
-// Import Chart.js components
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,13 +29,11 @@ import {
   LineElement
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
-import supabase from '@/lib/helper'; // Adjust path as needed
-import { useUser } from '@/components/providers/UserContext'; // Adjust path as needed
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Adjust path as needed
-import { Button } from '@/components/ui/button'; // Adjust path as needed
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Adjust path as needed
-
-// Register Chart.js components
+import supabase from '@/lib/helper'; 
+import { useUser } from '@/components/providers/UserContext'; 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; 
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; 
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -49,15 +45,12 @@ ChartJS.register(
   PointElement,
   LineElement
 );
-
 // --- Data Fetching Hooks ---
-
 // Hook to fetch client information
 const useClientInfo = (clientId) => {
   const [clientInfo, setClientInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   useEffect(() => {
     const fetchClientInfo = async () => {
       if (!clientId) {
@@ -71,7 +64,6 @@ const useClientInfo = (clientId) => {
           .select('id, name, location')
           .eq('id', clientId)
           .single();
-
         if (error) throw error;
         if (!data) {
           throw new Error("Client not found.");
@@ -84,19 +76,15 @@ const useClientInfo = (clientId) => {
         setLoading(false);
       }
     };
-
     fetchClientInfo();
   }, [clientId]);
-
   return { clientInfo, loading, error };
 };
-
 // Hook to fetch client's lockers
 const useClientLockers = (clientId) => {
   const [lockers, setLockers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   useEffect(() => {
     const fetchLockers = async () => {
       if (!clientId) return;
@@ -104,10 +92,9 @@ const useClientLockers = (clientId) => {
         setLoading(true);
         const { data, error } = await supabase
           .from('lockers')
-          .select('id, locker_number, door_count, client_id')
+          .select('id, name, door_count, client_id')
           .eq('client_id', clientId)
-          .order('locker_number', { ascending: true });
-
+          .order('name', { ascending: true });
         if (error) throw error;
         setLockers(data || []);
       } catch (err) {
@@ -117,13 +104,10 @@ const useClientLockers = (clientId) => {
         setLoading(false);
       }
     };
-
     fetchLockers();
   }, [clientId]);
-
   return { lockers, loading, error };
 };
-
 // Hook to fetch aggregated dashboard data (doors, activity, notifications)
 const useDashboardData = (clientId) => {
   const [dashboardData, setDashboardData] = useState({
@@ -133,15 +117,13 @@ const useDashboardData = (clientId) => {
     loading: true,
     error: null
   });
-
   useEffect(() => {
     const fetchData = async () => {
       if (!clientId) return;
-
       try {
         setDashboardData(prev => ({ ...prev, loading: true, error: null }));
-
-        // 1. Fetch all doors for the client's lockers
+        
+        // 1. Fetch doors data
         const { data: doorsData, error: doorsError } = await supabase
           .from('locker_doors')
           .select(`
@@ -150,16 +132,14 @@ const useDashboardData = (clientId) => {
             status,
             locker_id,
             assigned_at,
-            locker:lockers!inner(locker_number, client_id)
+            locker:lockers!inner(name, client_id)
           `)
           .eq('locker.client_id', clientId)
           .order('locker_id', { ascending: true })
           .order('door_number', { ascending: true });
-
         if (doorsError) throw doorsError;
 
-        // 2. Fetch recent activity (example: last 10 door events)
-        // Note: You might want to join with clients_users for user details
+        // 2. Fetch recent activity
         const { data: activityData, error: activityError } = await supabase
           .from('locker_door_events')
           .select(`
@@ -167,16 +147,14 @@ const useDashboardData = (clientId) => {
             event_type,
             created_at,
             locker_door_id,
-            locker_door:locker_doors!inner(door_number, locker:lockers!inner(locker_number, client_id))
+            locker_door:locker_doors!inner(door_number, locker:lockers!inner(name, client_id))
           `)
           .eq('locker_door.locker.client_id', clientId)
           .order('created_at', { ascending: false })
           .limit(10);
-
         if (activityError) throw activityError;
 
         // 3. Fetch notifications (example: overdue doors)
-        // This is a simplified example. You might have a dedicated notifications table.
         const { data: notificationsData, error: notificationsError } = await supabase
           .from('locker_doors')
           .select(`
@@ -184,34 +162,33 @@ const useDashboardData = (clientId) => {
             door_number,
             status,
             assigned_at,
-            locker:lockers!inner(locker_number, client_id)
+            locker:lockers!inner(name, client_id)
           `)
           .eq('locker.client_id', clientId)
-          .eq('status', 'overdue')
-          .order('assigned_at', { ascending: true }) // Oldest overdue first
-          .limit(5); // Limit notifications
-
+          .eq('status', 'overdue') // Assuming 'overdue' is a valid status
+          .order('assigned_at', { ascending: true }) 
+          .limit(5);
         if (notificationsError) throw notificationsError;
 
         // Format activity data
         const formattedActivity = activityData.map(event => {
             let message = `Unknown event for Door ${event.locker_door?.door_number || 'N/A'}`;
-            if (event.locker_door?.locker?.locker_number !== undefined) {
-                 message = `Door ${event.locker_door.door_number} (Locker ${event.locker_door.locker.locker_number}) was ${event.event_type}`;
+            if (event.locker_door?.locker?.name !== undefined) {
+                 message = `Door ${event.locker_door.door_number} (Locker ${event.locker_door.locker.name}) was ${event.event_type}`;
             }
             return {
                 id: event.id,
-                type: event.event_type, // 'opened', 'closed', 'locked', 'unlocked'
+                type: event.event_type,
                 message: message,
-                time: new Date(event.created_at).toLocaleString(), // Or use date-fns for relative time
+                time: new Date(event.created_at).toLocaleString(),
             };
         });
 
-        // Format notifications data (simple overdue list)
+        // Format notifications data
         const formattedNotifications = notificationsData.map(door => ({
             id: door.id,
-            type: 'warning', // Default type for overdue
-            message: `Door ${door.door_number} (Locker ${door.locker.locker_number}) is overdue.`,
+            type: 'warning',
+            message: `Door ${door.door_number} (Locker ${door.locker.name}) is overdue.`,
             time: door.assigned_at ? new Date(door.assigned_at).toLocaleString() : 'Unknown',
         }));
 
@@ -231,25 +208,18 @@ const useDashboardData = (clientId) => {
         }));
       }
     };
-
     fetchData();
   }, [clientId]);
-
   return dashboardData;
 };
-
 // --- Main Component ---
-
 const ClientDashboard = () => {
   const { clientId, loading: userContextLoading } = useUser();
-
   const { clientInfo, loading: clientInfoLoading, error: clientInfoError } = useClientInfo(clientId);
   const { lockers, loading: lockersLoading } = useClientLockers(clientId);
   const { doors, recentActivity, notifications, loading: dashboardDataLoading, error: dashboardDataError } = useDashboardData(clientId);
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
   // Determine overall loading state
   useEffect(() => {
     if (!userContextLoading && !clientInfoLoading && !lockersLoading && !dashboardDataLoading) {
@@ -258,7 +228,6 @@ const ClientDashboard = () => {
       setIsLoading(true);
     }
   }, [userContextLoading, clientInfoLoading, lockersLoading, dashboardDataLoading]);
-
   // Determine overall error state
   useEffect(() => {
      const errorMessage = clientInfoError || dashboardDataError;
@@ -268,14 +237,12 @@ const ClientDashboard = () => {
         setError(null);
      }
   }, [clientInfoError, dashboardDataError]);
-
-
   // Calculate statistics based on fetched data
   const totalLockers = lockers.length;
   const totalDoors = doors.length;
-  const occupiedCount = doors.filter(d => d.status === 'occupied').length;
+  const occupiedCount = doors.filter(d => d.status === 'occupied').length; // Assuming 'occupied' is a valid status
   const availableCount = doors.filter(d => d.status === 'available').length;
-  const overdueCount = doors.filter(d => d.status === 'overdue').length;
+  const overdueCount = doors.filter(d => d.status === 'overdue').length; // Assuming 'overdue' is a valid status
 
   // Prepare data for charts
   const statusChartData = {
@@ -285,9 +252,9 @@ const ClientDashboard = () => {
         label: 'Doors',
         data: [occupiedCount, availableCount, overdueCount],
         backgroundColor: [
-          'rgba(59, 130, 246, 0.8)', // Blue for occupied
-          'rgba(34, 197, 94, 0.8)',  // Green for available
-          'rgba(239, 68, 68, 0.8)'   // Red for overdue
+          'rgba(59, 130, 246, 0.8)', 
+          'rgba(34, 197, 94, 0.8)',  
+          'rgba(239, 68, 68, 0.8)'  
         ],
         borderColor: [
           'rgba(59, 130, 246, 1)',
@@ -298,15 +265,12 @@ const ClientDashboard = () => {
       },
     ],
   };
-
-  // Simulate weekly usage data - In a real scenario, you'd aggregate historical data
-  // For now, we'll keep it static or derive from current state if needed differently
   const usageChartData = {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
         label: 'Usage %',
-        data: [70, 80, 60, 90, 95, 85, 75], // Placeholder data
+        data: [70, 80, 60, 90, 95, 85, 75], 
         fill: true,
         backgroundColor: 'rgba(59, 130, 246, 0.2)',
         borderColor: 'rgba(59, 130, 246, 1)',
@@ -314,7 +278,6 @@ const ClientDashboard = () => {
       },
     ],
   };
-
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -328,7 +291,7 @@ const ClientDashboard = () => {
   // Handle loading and error states
   if (userContextLoading || isLoading) {
     return (
-      <div className="min-h-screen  flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your dashboard...</p>
@@ -336,7 +299,6 @@ const ClientDashboard = () => {
       </div>
     );
   }
-
   if (error || !clientId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -354,7 +316,6 @@ const ClientDashboard = () => {
       </div>
     );
   }
-
   if (!clientInfo) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -372,7 +333,7 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Client Title */}
         <div className="mb-6">
@@ -380,7 +341,6 @@ const ClientDashboard = () => {
           {clientInfo.location && <p className="text-sm text-gray-500">Location: {clientInfo.location}</p>}
           <p className="text-sm text-gray-500 mt-1">Welcome back! Here's an overview of your locker system.</p>
         </div>
-
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -428,7 +388,6 @@ const ClientDashboard = () => {
             </CardContent>
           </Card>
         </div>
-
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <Card>
@@ -468,7 +427,6 @@ const ClientDashboard = () => {
             </CardContent>
           </Card>
         </div>
-
         {/* Activity and Notifications & Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recent Activity */}
@@ -504,7 +462,6 @@ const ClientDashboard = () => {
               </Button> */}
             </CardContent>
           </Card>
-
           <div className="space-y-8">
             {/* Notifications */}
             <Card>
@@ -537,7 +494,6 @@ const ClientDashboard = () => {
                 </Button> */}
               </CardContent>
             </Card>
-
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -569,9 +525,7 @@ const ClientDashboard = () => {
     </div>
   );
 };
-
 // Simple placeholder icons for chart titles
 const PieChartIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>;
 const BarChartIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
-
 export default ClientDashboard;

@@ -1,105 +1,112 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   Plus,
   Filter,
   User,
-  Mail,
   Phone,
-  Building2,
   Calendar,
   CheckCircle,
   XCircle,
   Lock,
-  CreditCard
+  Trash2,
+  Eye,
+  Edit
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { QuickStoreLoadingCompact } from '@/components/ui/QuickStoreLoading';
 import DataTable from '@/components/ui/DataTable';
-import AddUserModal from './AddUserModal';
 import { useRouter } from 'next/navigation';
-
+import supabase from '@/lib/helper';
+import { useDialog } from '@/components/providers/DialogProvider';
+import { useLoading } from '@/components/providers/LoadingProvider';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [client, setClient] = useState(null);
   const router = useRouter();
+  const { showDelete, showSuccess, showError, showConfirm } = useDialog();
+  const { show: showLoading, hide: hideLoading } = useLoading();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const mockClientUsers = [
-        {
-          id: 'user-1',
-          client_id: 'client-1',
-          first_name: 'John',
-          last_name: 'Doe',
-          full_name: 'John Doe',
-          email: 'john.doe@example.com',
-          phone: '+1 (555) 123-4567',
-          department: 'IT',
-          position: 'Developer',
-          is_active: true,
-          created_at: '2023-01-15T00:00:00Z',
-          assigned_locker_door: 'Locker A - Door 3',
-          payment_method: 'Credit Card'
-        },
-        {
-          id: 'user-2',
-          client_id: 'client-1',
-          first_name: 'Jane',
-          last_name: 'Smith',
-          full_name: 'Jane Smith',
-          email: 'jane.smith@example.com',
-          phone: '+1 (555) 987-6543',
-          department: 'HR',
-          position: 'Manager',
-          is_active: true,
-          created_at: '2022-11-01T00:00:00Z',
-          assigned_locker_door: 'Locker B - Door 12',
-          payment_method: 'Invoice'
-        },
-        {
-          id: 'user-3',
-          client_id: 'client-2',
-          first_name: 'Robert',
-          last_name: 'Johnson',
-          full_name: 'Robert Johnson',
-          email: 'robert.j@example.com',
-          phone: '+1 (555) 456-7890',
-          department: 'Finance',
-          position: 'Analyst',
-          is_active: false,
-          created_at: '2023-03-22T00:00:00Z',
-          assigned_locker_door: null,
-          payment_method: 'Credit Card'
-        },
-        {
-          id: 'user-4',
-          client_id: 'client-2',
-          first_name: 'Emily',
-          last_name: 'Davis',
-          full_name: 'Emily Davis',
-          email: 'emily.d@example.com',
-          phone: '+1 (555) 234-5678',
-          department: 'Marketing',
-          position: 'Specialist',
-          is_active: true,
-          created_at: '2024-01-10T00:00:00Z',
-          assigned_locker_door: 'Locker C - Door 7',
-          payment_method: 'Bank Transfer'
-        },
-      ];
-      setUsers(mockClientUsers);
-      setLoading(false);
-    }, 800);
+    const fetchClientInfo = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('client_id')
+            .eq('id', user.id)
+            .single();
+          
+          if (error) throw error;
+          setClient({ id: data.client_id });
+        }
+      } catch (error) {
+        console.error('Error fetching client info:', error);
+      }
+    };
+
+    fetchClientInfo();
   }, []);
+
+  useEffect(() => {
+    if (!client?.id) return;
+
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('clients_users')
+          .select(`
+            id,
+            full_name,
+            email,
+            phone,
+            department,
+            position,
+            is_active,
+            created_at,
+            locker_doors(
+              id,
+              door_number,
+              locker:lockers(name)
+            )
+          `)
+          .eq('client_id', client.id);
+        
+        if (error) throw error;
+        
+        const transformedUsers = data.map(user => {
+          let assigned_locker_door = null;
+          if (user.locker_doors && user.locker_doors.length > 0) {
+            const door = user.locker_doors[0];
+            assigned_locker_door = `Locker ${door.locker.locker_number} - Door ${door.door_number}`;
+          }
+          
+          return {
+            ...user,
+            first_name: user.full_name.split(' ')[0] || '',
+            last_name: user.full_name.split(' ').slice(1).join(' ') || '',
+            assigned_locker_door
+          };
+        });
+        
+        setUsers(transformedUsers);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [client?.id]);
 
   const filteredUsers = users.filter(user =>
     Object.values(user).some(
@@ -115,7 +122,7 @@ const UserManagement = () => {
       label: 'Full Name',
       render: (_, user) => (
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-600 rounded-md flex items-center justify-center flex-shrink-0"> {/* Use orange gradient */}
+          <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-600 rounded-md flex items-center justify-center flex-shrink-0">
             <User className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -125,14 +132,13 @@ const UserManagement = () => {
         </div>
       )
     },
- 
     {
       key: 'phone',
       label: 'Phone',
       render: (value) => (
         <div className="flex items-center space-x-2">
           <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <span className="text-gray-700 text-sm">{value}</span>
+          <span className="text-gray-700 text-sm">{value || 'N/A'}</span>
         </div>
       )
     },
@@ -167,38 +173,124 @@ const UserManagement = () => {
       }
     },
     {
-      key: 'payment_method',
-      label: 'Payment Method',
+      key: 'assigned_locker_door',
+      label: 'Assigned Locker',
       render: (value) => (
         <div className="flex items-center space-x-2">
-          <CreditCard className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <span className="text-gray-700 text-sm">{value || 'N/A'}</span>
+          <Lock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-700 text-sm">{value || 'None'}</span>
         </div>
       )
     }
   ];
 
-
-  const handleUserAction = (action, user) => {
-    console.log(`Action: ${action}`, user);
-    // Implement view, edit, delete logic here
-    // e.g., router.push(`/client_admin/users/${user.id}`) for view/edit
-    // e.g., open a confirmation modal for delete
+  const handleViewUser = (user) => {
+    router.push(`/client_admin/user-management/users/${user.id}`);
   };
 
+  const handleEditUser = (user) => {
+    router.push(`/client_admin/user-management/users/edit/${user.id}`);
+  };
 
-  const handleViewUser = () =>{
-    router.push(`/client_admin/user-management/users/${user_id}`)
-  } 
+  const handleDeleteUser = useCallback(async (user) => {
+    showDelete({
+      title: "Delete User",
+      description: `Are you sure you want to delete ${user.full_name}? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          showLoading("Deleting user...");
+          
+          // Check for locker door assignments
+          const { data: lockerDoors, error: lockerDoorsError } = await supabase
+            .from('locker_doors')
+            .select('id')
+            .eq('assigned_user_id', user.id);
+          
+          if (lockerDoorsError) throw lockerDoorsError;
+          
+          if (lockerDoors && lockerDoors.length > 0) {
+            hideLoading();
+            showConfirm({
+              title: "Cannot Delete User",
+              description: `${user.full_name} is currently assigned to locker doors. Please unassign them first before deleting.`,
+              confirmText: "Okay",
+              variant: "warning"
+            });
+            return;
+          }
+          
+          // Delete associated user_credentials records
+          const { error: credentialsError } = await supabase
+            .from('user_credentials')
+            .delete()
+            .eq('user_id', user.id);
+          
+          if (credentialsError) throw credentialsError;
+          
+          // Delete associated locker_door_events records
+          const { error: eventsError } = await supabase
+            .from('locker_door_events')
+            .delete()
+            .eq('user_id', user.id);
+          
+          if (eventsError) throw eventsError;
+          
+          // Delete the user from clients_users
+          const { error: userError } = await supabase
+            .from('clients_users')
+            .delete()
+            .eq('id', user.id);
+          
+          if (userError) throw userError;
+          
+          // Remove user from state
+          setUsers(users.filter(u => u.id !== user.id));
+          showSuccess("User deleted successfully");
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          hideLoading();
+          
+          if (error.code === '23503') {
+            showConfirm({
+              title: "Cannot Delete User",
+              description: `${user.full_name} has associated data that prevents deletion. Please ensure all locker assignments are removed first.`,
+              confirmText: "Okay",
+              variant: "warning"
+            });
+          } else {
+            showError("Failed to delete user: " + error.message);
+          }
+        } finally {
+          hideLoading();
+        }
+      }
+    });
+  }, [users, showDelete, showSuccess, showError, showConfirm, showLoading, hideLoading]);
 
-  const handleAddUser= () => {
-    router.push('/client_admin/user-management/users/AddUserPage')
-  }
+  const handleAddUser = () => {
+    router.push('/client_admin/user-management/users/AddUserPage');
+  };
+
+  const handleUserAction = (action, user) => {
+    switch (action) {
+      case 'view':
+        handleViewUser(user);
+        break;
+      case 'edit':
+        handleEditUser(user);
+        break;
+      case 'delete':
+        handleDeleteUser(user);
+        break;
+      default:
+        console.log(`Unknown action: ${action}`, user);
+    }
+  };
 
   return (
     <div className="w-full p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header - Simplified for client users */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">User Management</h1>
@@ -213,7 +305,7 @@ const UserManagement = () => {
           </Button>
         </div>
 
-        {/* Controls - Simplified, removed complex tabs for now */}
+        {/* Controls */}
         <Card className="mb-6 shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
@@ -230,7 +322,7 @@ const UserManagement = () => {
               </div>
               {/* Actions */}
               <div className="flex items-center space-x-2 w-full md:w-auto">
-                <Button variant="outline" size="sm" className="h-9 w-9 p-0 border-gray-200 text-gray-600 hover:bg-gray-50"> {/* Adjusted button style */}
+                <Button variant="outline" size="sm" className="h-9 w-9 p-0 border-gray-200 text-gray-600 hover:bg-gray-50">
                   <Filter className="w-4 h-4" />
                 </Button>
               </div>
@@ -238,11 +330,14 @@ const UserManagement = () => {
           </CardContent>
         </Card>
 
-        {/* Content Table using the new DataTable component */}
+        {/* Content Table */}
         <div>
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <QuickStoreLoadingCompact message="Loading client users..." />
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mb-2"></div>
+                <p className="text-gray-600">Loading users...</p>
+              </div>
             </div>
           ) : (
             <DataTable
@@ -251,7 +346,27 @@ const UserManagement = () => {
               onAction={handleUserAction}
               emptyStateMessage="No users found."
               searchTerm={searchTerm}
-              showActions={true} 
+              showActions={true}
+              actionButtons={[
+                { 
+                  label: 'View', 
+                  icon: Eye, 
+                  action: 'view', 
+                  className: "text-blue-600 hover:text-blue-800" 
+                },
+                { 
+                  label: 'Edit', 
+                  icon: Edit, 
+                  action: 'edit', 
+                  className: "text-orange-600 hover:text-orange-800" 
+                },
+                { 
+                  label: 'Delete', 
+                  icon: Trash2, 
+                  action: 'delete', 
+                  className: "text-red-600 hover:text-red-800" 
+                }
+              ]}
               className="" 
             />
           )}

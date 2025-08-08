@@ -42,6 +42,8 @@ import {
   LocateIcon,
   Settings2Icon,
   UserPlus,
+  Tablet,
+  DollarSign,
 } from "lucide-react";
 import { useLoading } from "../providers/LoadingProvider";
 
@@ -87,91 +89,33 @@ const AdminSidebar = ({ isOpen, role }) => {
   const groupStyle = "text-gray-700 hover:bg-gray-100";
   // --- End Updated Styles ---
 
-  // --- ADMIN SIDEBAR MENU (Updated for Locker System Context) ---
   const adminMenu = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", type: "single" },
 
-    // --- Core Locker Management ---
+
     {
       label: "Locker Management", icon: Lock, type: "group", children: [
         { label: "Locker Inventory", icon: LayoutDashboard, path: "/admin/locker-management/inventory" },
-        { label: "Assign Lockers", icon: UserCog, path: "/admin/locker-management/assign" },
-        { label: "Locker Groups/Zones", icon: MapPin, path: "/admin/locker-management/groups" },
-        { label: "Reservation System", icon: Clock, path: "/admin/locker-management/reservations" },
-        { label: "Lockers Location ", icon: LocateIcon, path: "/admin/locker-management/location" },
-        { label: "Locker Session History", icon: FileClock, type: "single", path: "/admin/locker-history" },
-        { label: "Lockers Settings", icon: Settings2Icon, type: "single", path: "/admin/locker-history" },
-      ]
-    },
-
-    {
-      label: "User Management", icon: Users, type: "group", children: [
-        { label: "Employees", icon: Users2, path: "/admin/user-management/employees" },
-        { label: "Guest", icon: Briefcase, path: "/admin/user-management/employees" },
-        { label: "Members", icon: Briefcase, path: "/admin/user-management/employees" },
+        { label: "Lockers Device", icon: Tablet, path: "/admin/locker-management/device" },
+        { label: "Lockers Deployed", icon: ClipboardCheck, path: "/admin/locker-management/device" },
       ]
     },
     {
       label: "Client Management", icon: Building2, type: "group", children: [
-        {
-          label: "Client List",
-          icon: Users,
-          path: "/admin/clients"
-        },
-        {
-          label: "Add Client",
-          icon: UserPlus,
-          path: "/admin/clients/new"
-        }
-      ]
-    },
-
-
-    // --- Access & Security ---
-    {
-      label: "Access Control", icon: Shield, type: "group", children: [
-        { label: "Access Logs", icon: CalendarDays, path: "/admin/access-control/logs" },
-        { label: "Access Rules", icon: Settings, path: "/admin/access-control/rules" },
-        { label: "Audit Trail", icon: Shield, path: "/admin/access-control/audit-trail" },
-      ]
-    },
-    // --- Maintenance ---
-    {
-      label: "Maintenance", icon: Wrench, type: "group", children: [
-        { label: "Maintenance Logs", icon: FileClock, path: "/admin/maintenance/logs" },
-        { label: "Scheduled Maintenance", icon: Calendar, path: "/admin/maintenance/schedule" },
-        { label: "Locker Status", icon: Activity, path: "/admin/maintenance/status" },
-      ]
-    },
- 
-    {
-      label: "Communication", icon: MessageCircle, type: "group", children: [
-        { label: "Announcements", icon: Megaphone, path: "/admin/communication/announcements" },
-        { label: "Messaging", icon: MessageCircle, path: "/admin/communication/messages" },
-        { label: "Email Templates", icon: Mail, path: "/admin/communication/email-templates" },
+        { label: "Client List",icon: Users,path: "/admin/clients/clientlist" },
+        { label: "Client Type",icon: UserPlus,path: "/admin/clients/client-type" },
+        { label: "Client Payments",icon: DollarSign,path: "/admin/clients/client-type" },
       ]
     },
     {
-      label: "Content Library", icon: BookOpen, type: "group", children: [
-        { label: "User Guides", icon: FileTextDoc, path: "/admin/documents/user-guides" },
-        { label: "Knowledge Base", icon: BookOpen, path: "/admin/knowledge-base" },
-        { label: "News/Blog", icon: Newspaper, path: "/admin/news" },
+      label: "Reports", icon: Building2, type: "group", children: [
+        { label: "Client List",icon: Users,path: "/admin/clients/clientlist" },
+        { label: "Client Type",icon: UserPlus,path: "/admin/clients/client-type" },
+        { label: "Client Payments",icon: DollarSign,path: "/admin/clients/client-type" },
       ]
     },
-    {
-      label: "Analytics & Reports", icon: TrendingUp, type: "group", children: [
-        { label: "Usage Reports", icon: BarChart, path: "/admin/analytics-report-management/usage-reports" },
-        { label: "Access Analytics", icon: TrendingUp, path: "/admin/analytics-report-management/access-analytics" },
-        { label: "Financial Reports", icon: Wallet, path: "/admin/analytics-report-management/financial-reports" },
-      ]
-    },
-    {
-      label: "System Settings", icon: Settings2, type: "group", children: [
-        { label: "General Settings", icon: Settings, path: "/admin/system-settings/general" },
-        { label: "Integrations", icon: Plug, path: "/admin/system-settings/integrations" },
-        { label: "Backup & Restore", icon: DatabaseBackup, path: "/admin/system-settings/backup" },
-      ]
-    },
+    
+  
     { label: "Profile Settings", icon: Settings, path: "/admin/profile", type: "single" },
 
   ];

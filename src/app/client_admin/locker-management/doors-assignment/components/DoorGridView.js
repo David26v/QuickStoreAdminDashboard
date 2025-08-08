@@ -10,8 +10,8 @@ const DoorGridView = ({
   locker,
   doors,
   loading,
-  onSelectDoor, // Handler passed from parent
-  onBack // Handler passed from parent (if needed for internal use)
+  onSelectDoor,
+  onBack 
 }) => {
   if (loading) {
     return (

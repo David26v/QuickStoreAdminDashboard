@@ -59,3 +59,43 @@ export const getStatusColor = (status) => {
     default: return 'bg-gray-100'
   }
 }
+
+//utils for devices 
+export const getStatusColorDevice = (status) => {
+    switch (status) {
+      case 'available': return 'text-green-600 bg-green-100';
+      case 'no_device_yet': return 'text-purple-600 bg-purple-100';
+      case 'under_maintenance': return 'text-yellow-600 bg-yellow-100';
+      case 'onsite': return 'text-indigo-600 bg-indigo-100';
+      case 'in_warehouse': return 'text-gray-600 bg-gray-100';
+      case 'arriving_to_client': return 'text-orange-600 bg-orange-100';
+      case 'received_by_client': return 'text-blue-600 bg-blue-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  export const getStatusBgColorDevice = (status) => {
+    switch (status) {
+      case 'available': return 'bg-green-50';
+      case 'no_device_yet': return 'bg-purple-50';
+      case 'under_maintenance': return 'bg-yellow-50';
+      case 'onsite': return 'bg-indigo-50';
+      case 'in_warehouse': return 'bg-gray-50';
+      case 'arriving_to_client': return 'bg-orange-50';
+      case 'received_by_client': return 'bg-blue-50';
+      default: return 'bg-gray-50';
+    }
+  };
+
+  export const getStatusLightColorDevice = (status) => {
+      switch (status) {
+        case 'available': return 'bg-green-500 shadow-[0_0_8px_2px_rgba(72,187,120,0.5)]';
+        case 'no_device_yet':
+        case 'received_by_client': return 'bg-blue-500 shadow-[0_0_8px_2px_rgba(59,130,246,0.5)]';
+        case 'under_maintenance': return 'bg-yellow-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]';
+        case 'onsite': return 'bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.5)]';
+        case 'in_warehouse': return 'bg-gray-500 shadow-[0_0_8px_2px_rgba(107,114,128,0.5)]';
+        case 'arriving_to_client': return 'bg-orange-500 shadow-[0_0_8px_2px_rgba(249,115,22,0.5)]';
+        default: return 'bg-gray-400';
+      }
+    };

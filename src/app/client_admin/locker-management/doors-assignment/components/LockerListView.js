@@ -83,7 +83,7 @@ const LockerListView = ({
                       <Building2 className="w-7 h-7 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">Locker #{locker.locker_number}</h3>
+                      <h3 className="text-xl font-bold text-white">{locker.name}</h3>
                       <p className="text-slate-300 text-sm">Secure Storage Unit</p>
                     </div>
                   </div>
@@ -110,7 +110,8 @@ const LockerListView = ({
                   <span className="text-sm text-slate-600">Status: </span>
                   <span className="text-sm font-semibold text-green-600 capitalize">{locker.status}</span>
                 </div>
-                <Button
+                
+                 <Button
                   className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 group-hover:shadow-lg shadow-sm"
                 >
                   <span>View All Doors</span>
