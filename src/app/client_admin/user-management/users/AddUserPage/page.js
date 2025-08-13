@@ -89,111 +89,102 @@ const ClientUserAdd = () => {
   };
 
   const generateRandomCode = (length = 6) => {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateStep(currentStep)) return;
-    setIsSubmitting(true);
-
-    try {
-        const { data: userData, error: userError } = await supabase
-            .from('clients_users')
-            .insert({
-                client_id: clientId,
-                full_name: formData.full_name,
-                email: formData.email,
-                phone: formData.phone,
-                is_active: formData.is_active
-            })
-            .select()
-            .single(); 
-
-        if (userError) throw userError;
-
-        const newUserId = userData.id;
-        setCreatedUserId(newUserId);
-
-   
-        if (activeAuthMethods.includes('access_code') && (formData.generate_code || (!formData.generate_code && formData.access_code.trim()))) {
-            let codeToUse = formData.access_code.trim();
-            if (formData.generate_code) {
-                codeToUse = generateRandomCode();
-                setFormData(prev => ({ ...prev, access_code: codeToUse }));
-            }
-  
-            const codeHash = btoa(codeToUse); 
-
-            const { data: credentialData, error: credentialError } = await supabase
-                .from('user_credentials')
-                .insert({
-                    user_id: newUserId,
-                    method_type: 'code',
-                    credential_hash: codeHash, 
-                    is_active: true
-                })
-                .select()
-                .single();
-
-            if (credentialError) throw credentialError;
-
-            setCreatedUserCodeId(credentialData.id); 
-        }
+  const characters = '0123456789'; 
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
 
 
-        if (formData.setup_biometric && formData.biometric_type) {
-            // Check if the specific biometric type is enabled
-            if (activeAuthMethods.includes(formData.biometric_type)) {
-                let credentialDataToInsert = {
-                    user_id: newUserId,
-                    method_type: formData.biometric_type,
-                    credential_hash: '', 
-                    is_active: true
-                };
+const handleSubmit = async () => {
+  if (!validateStep(currentStep)) return;
+  setIsSubmitting(true);
 
-                // Handle Card UID
-                if (formData.biometric_type === 'card' && formData.card_uid.trim()) {
-                    const cardUidHash = btoa(formData.card_uid.trim()); // Simple hash
-                    credentialDataToInsert.credential_hash = cardUidHash;
-                }
-             
-                else if (formData.biometric_type === 'face' || formData.biometric_type === 'palm') {
-                   
-                     credentialDataToInsert.credential_hash = 'PENDING_DEVICE_ENROLLMENT';
-                }
+  try {
+      const { data: userData, error: userError } = await supabase
+          .from('clients_users')
+          .insert({
+              client_id: clientId,
+              full_name: formData.full_name,
+              email: formData.email,
+              phone: formData.phone,
+              is_active: formData.is_active
+          })
+          .select()
+          .single(); 
 
-                const { data: biometricCredentialData, error: biometricCredentialError } = await supabase
-                    .from('user_credentials')
-                    .insert(credentialDataToInsert)
-                    .select()
-                    .single();
+      if (userError) throw userError;
 
-                if (biometricCredentialError) {
-                 
-                
-                    console.warn("Could not create biometric credential entry:", biometricCredentialError);
-                 
-                } 
-                else {
-                   
-                }
-            }
-        }
+      const newUserId = userData.id;
+      setCreatedUserId(newUserId);
+
+      if (activeAuthMethods.includes('access_code') && (formData.generate_code || (!formData.generate_code && formData.access_code.trim()))) {
+          let codeToUse = formData.access_code.trim();
+          if (formData.generate_code) {
+              codeToUse = generateRandomCode();
+              setFormData(prev => ({ ...prev, access_code: codeToUse }));
+          }
+
+          const response = await fetch('/api/create-user-credential', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  user_id: newUserId,
+                  access_code: codeToUse
+              }),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+              throw new Error(result.error || 'Failed to create credential');
+          }
+
+          setCreatedUserCodeId(result.data.id); 
+      }
+
+      // Handle biometric setup (unchanged)
+      if (formData.setup_biometric && formData.biometric_type) {
+          if (activeAuthMethods.includes(formData.biometric_type)) {
+              let credentialDataToInsert = {
+                  user_id: newUserId,
+                  method_type: formData.biometric_type,
+                  credential_hash: '', 
+                  is_active: true
+              };
+
+              // Handle Card UID
+              if (formData.biometric_type === 'card' && formData.card_uid.trim()) {
+                  const cardUidHash = btoa(formData.card_uid.trim()); 
+                  credentialDataToInsert.credential_hash = cardUidHash;
+              }
+           
+              else if (formData.biometric_type === 'face' || formData.biometric_type === 'palm') {
+                 credentialDataToInsert.credential_hash = 'PENDING_DEVICE_ENROLLMENT';
+              }
+
+              const { data: biometricCredentialData, error: biometricCredentialError } = await supabase
+                  .from('user_credentials')
+                  .insert(credentialDataToInsert)
+                  .select()
+                  .single();
+
+              if (biometricCredentialError) {
+                  console.warn("Could not create biometric credential entry:", biometricCredentialError);
+              }
+          }
+      }
 
 
-        console.log('User created successfully with ID:', newUserId);
-
-    } catch (err) {
-        console.error('Error creating user:', err);
-        setAuthMethodsError("Failed to create user. Please try again.");
-    } finally {
-        setIsSubmitting(false);
-    }
+  } catch (err) {
+      console.error('Error creating user:', err);
+      setAuthMethodsError("Failed to create user. Please try again.");
+  } finally {
+      setIsSubmitting(false);
+  }
 };
 
   const copyToClipboard = (text) => {
@@ -219,7 +210,7 @@ const ClientUserAdd = () => {
           .from('client_locker_settings')
           .select('id')
           .eq('client_id', clientId)
-          .single(); // Expecting a single result
+          .single();
         if (settingsError) {
            if (settingsError.code === 'PGRST116') {
              console.warn(`No client_locker_settings found for client ID: ${clientId}`);
@@ -244,7 +235,6 @@ const ClientUserAdd = () => {
           .map(item => item.auth_methods?.technical_name)
           .filter(name => name);
         setActiveAuthMethods(methodNames);
-        console.log(`Fetched active auth methods for client ${clientId} (setting ID: ${clientSettingId}):`, methodNames);
       }
       catch (err) {
         console.error("Error fetching client auth methods:", err);
@@ -261,8 +251,6 @@ const ClientUserAdd = () => {
   const headerGradientTo = "to-slate-900";
   const primaryGradientFrom = "from-orange-500";
   const primaryGradientTo = "to-orange-600";
-  const secondaryGradientFrom = "from-orange-400";
-  const secondaryGradientTo = "to-orange-500";
   const progressBarGradientFrom = primaryGradientFrom;
   const progressBarGradientTo = primaryGradientTo;
   const nextButtonGradientFrom = primaryGradientFrom;
@@ -414,7 +402,7 @@ const ClientUserAdd = () => {
                 </div>
 
 
-                {activeAuthMethods.includes('code') && (
+                {activeAuthMethods.includes('access_code') && (
                   <div className="p-6 border-2 border-blue-200 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50">
                     <div className="flex items-center mb-4">
                       <div className="mr-3">

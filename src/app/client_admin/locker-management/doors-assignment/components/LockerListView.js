@@ -43,7 +43,6 @@ const LockerListView = ({
 
   return (
     <div>
-      {/* Search and Request Button Section */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="relative w-full sm:w-auto flex-grow">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />

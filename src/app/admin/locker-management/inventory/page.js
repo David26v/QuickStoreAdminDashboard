@@ -90,7 +90,7 @@ const LockerInventory = () => {
 
       return {
         id: locker.id,
-        locker_number: locker.locker_number,
+        locker_name: locker.name,
         status: locker.status,
         client_id: locker.client_id,
         assigned_at: locker.assigned_at,
@@ -111,6 +111,7 @@ const LockerInventory = () => {
     });
 
     setLockers(formattedLockers);
+    console.log("Lockers fetched successfully:", formattedLockers);
     setFilteredLockers(formattedLockers);
   } 
   catch (error) {
@@ -198,7 +199,6 @@ const LockerInventory = () => {
   };
 
   const handleUnassignDevice = async (lockerId) => {
-    console.log(`Unassign device from locker ${lockerId}`);
     try {
       const { error } = await supabase
         .from('lockers') 
@@ -387,7 +387,7 @@ const LockerInventory = () => {
                 <div className="p-5 pb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-800">{'No name' || locker.name} </h3>
+                      <h3 className="text-2xl font-bold text-gray-800">{locker.locker_name || 'No name'} </h3>
                       <div className="flex items-center mt-1">
                         {getStatusIcon(locker.status)}
                         <span className={`ml-2 text-sm font-medium ${getStatusColorDevice(locker.status).split(' ')[1]}`}>

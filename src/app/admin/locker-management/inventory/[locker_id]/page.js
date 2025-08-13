@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,8 +36,6 @@ import getStatusBadge from '../components/StatusBadge';
 import { useParams, useRouter } from 'next/navigation';
 import supabase from '@/lib/helper';
 
-
-
 const DeviceModal = ({ isOpen, onClose, onDeviceCreated, clients, lockerClientId }) => {
   const [formData, setFormData] = useState({
     device_id: '',
@@ -49,11 +47,13 @@ const DeviceModal = ({ isOpen, onClose, onDeviceCreated, clients, lockerClientId
     client_id: lockerClientId || ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     if (lockerClientId) {
       setFormData(prev => ({ ...prev, client_id: lockerClientId }));
     }
   }, [lockerClientId]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -62,7 +62,6 @@ const DeviceModal = ({ isOpen, onClose, onDeviceCreated, clients, lockerClientId
         .from('devices')
         .insert([formData]);
       if (error) throw error;
-    
       setFormData({
         device_id: '',
         manufacturer: '',
@@ -81,7 +80,9 @@ const DeviceModal = ({ isOpen, onClose, onDeviceCreated, clients, lockerClientId
       setIsSubmitting(false);
     }
   };
+
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -220,22 +221,11 @@ const LockerInformationDetails = () => {
   const [editedData, setEditedData] = useState({});
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState({ type: '', text: '' });
-  const [particles, setParticles] = useState([]);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [currentAssignedDeviceId, setCurrentAssignedDeviceId] = useState(null);
+  const [selectedDeviceIdForSave, setSelectedDeviceIdForSave] = useState(null);
   const router = useRouter();
   const { locker_id } = useParams();
-
-
-
-  useEffect(() => {
-    setParticles([...Array(6)].map((_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      delay: Math.random() * 3,
-      duration: 3 + Math.random() * 2
-    })));
-  }, []);
 
 
   useEffect(() => {
@@ -252,85 +242,91 @@ const LockerInformationDetails = () => {
     };
   }, [saveMessage.text]);
 
-
   const loadLockerData = async () => {
-    if (!locker_id) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setFetchError(null);
-    setSaveMessage({ type: '', text: '' });
-    try {
-      const { data, error } = await supabase
-        .from('lockers')
-        .select(`
-          id,
-          name,
-          location,
-          status,
-          color,
-          size,
-          picture_url,
-          damage_picture_url,
-          created_at,
-          updated_at,
-          client:clients (id, name)
-        `)
-        .eq('id', locker_id)
-        .single();
-      if (error) throw error;
-      if (!data) {
-        throw new Error('Locker not found.');
-      }
-      setLockerData(data);
+  if (!locker_id) {
+    setLoading(false);
+    return;
+  }
 
-      setEditedData({
-        name: data.name || '',
-        location: data.location || '',
-        color: data.color || '',
-        size: data.size || '',
-        picture_url: data.picture_url || '',
-        damage_picture_url: data.damage_picture_url || '',
-        device_id: data.device_id || ''
-      });
+  setLoading(true);
+  setFetchError(null);
+  setSaveMessage({ type: '', text: '' });
 
-      if (data.device_id) {
-        loadDeviceInfo(data.device_id);
-      }
-    } catch (err) {
-      console.error('Error fetching locker information:', err);
-      setFetchError(err.message || 'Failed to load locker information.');
+  try {
+    // Fetch locker data
+    const { data: lockerData, error: lockerError } = await supabase
+      .from('lockers')
+      .select(`
+        id,
+        name,
+        location,
+        status,
+        color,
+        size,
+        picture_url,
+        damage_picture_url,
+        created_at,
+        updated_at,
+        client:clients (id, name)
+      `)
+      .eq('id', locker_id)
+      .single();
+
+    if (lockerError) throw lockerError;
+    if (!lockerData) throw new Error('Locker not found.');
+
+    setLockerData(lockerData);
+    setEditedData({
+      name: lockerData.name || '',
+      location: lockerData.location || '',
+      color: lockerData.color || '',
+      size: lockerData.size || '',
+      picture_url: lockerData.picture_url || '',
+      damage_picture_url: lockerData.damage_picture_url || '',
+    });
+
+
+    const { data: deviceData, error: deviceError } = await supabase
+      .from('devices')
+      .select(`
+        id,
+        device_id,
+        manufacturer,
+        model,
+        android_version,
+        app_version,
+        status,
+        clients (name)
+      `)
+      .eq('locker_id', locker_id)
+      .single();
+
+
+    if (deviceError) throw deviceError;
+      
+  
+
+    if (deviceData) {
+      const device_id = deviceData.id;
+      setCurrentAssignedDeviceId(device_id);
+      setSelectedDeviceIdForSave(deviceData.id);
+      setSelectedDevice(deviceData);
     } 
-    finally {
-      setLoading(false);
+    else {
+      setCurrentAssignedDeviceId(null);
+      setSelectedDeviceIdForSave(null);
+      setSelectedDevice(null);
     }
-  };
 
-  const loadDeviceInfo = async (deviceId) => {
-    try {
-      const { data, error } = await supabase
-        .from('devices')
-        .select(`
-          id,
-          device_id,
-          manufacturer,
-          model,
-          android_version,
-          app_version,
-          status,
-          clients (name)
-        `)
-        .eq('id', deviceId)
-        .single();
-      if (error) throw error;
-      if (data) {
-        setSelectedDevice(data);
-      }
-    } catch (err) {
-      console.error('Error fetching device information:', err);
-    }
-  };
+  } catch (err) {
+    console.error('Error fetching locker information:', err);
+    setFetchError(err.message || 'Failed to load locker information.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const loadDevices = async () => {
     try {
@@ -345,7 +341,6 @@ const LockerInformationDetails = () => {
           clients (name)
         `);
       if (error) throw error;
-      console.log('data devices', data);
       setDevices(data || []);
     } catch (err) {
       console.error('Error fetching devices:', err);
@@ -379,22 +374,22 @@ const LockerInformationDetails = () => {
         size: lockerData?.size || '',
         picture_url: lockerData?.picture_url || '',
         damage_picture_url: lockerData?.damage_picture_url || '',
-        device_id: lockerData?.device_id || ''
       });
       setSaveMessage({ type: '', text: '' });
     }
     setIsEditing(!isEditing);
   };
+
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setEditedData(prev => ({ ...prev, [id]: value }));
   };
 
   const handleDeviceChange = (deviceId) => {
-    setEditedData(prev => ({ ...prev, device_id: deviceId }));
+    setSelectedDeviceIdForSave(deviceId);
     if (deviceId) {
       const device = devices.find(d => d.id === deviceId);
-      setSelectedDevice(device);
+      setSelectedDevice(device || null);
     } else {
       setSelectedDevice(null);
     }
@@ -404,7 +399,6 @@ const LockerInformationDetails = () => {
     if (!locker_id) return;
     setSaveLoading(true);
     setSaveMessage({ type: '', text: '' });
-    
     try {
       const { error: lockerUpdateError } = await supabase
         .from('lockers')
@@ -420,23 +414,29 @@ const LockerInformationDetails = () => {
         .eq('id', locker_id);
 
       if (lockerUpdateError) throw lockerUpdateError;
+      
+      if (selectedDeviceIdForSave !== currentAssignedDeviceId) {
+        if (currentAssignedDeviceId) {
+          const { error: clearOldDeviceError } = await supabase
+            .from('devices')
+            .update({ locker_id: null })
+            .eq('id', currentAssignedDeviceId);
+          if (clearOldDeviceError) throw clearOldDeviceError;
+        }
 
-      if (editedData.device_id) {
-        const { error: deviceUpdateError } = await supabase
-          .from('devices')
-          .update({ locker_id: locker_id }) 
-          .eq('id', editedData.device_id);  
+        if (selectedDeviceIdForSave) {
+          const clientIdForDevice = lockerData?.client?.id; 
+          const updatePayload = { locker_id: locker_id };
+          if (clientIdForDevice) {
+             updatePayload.client_id = clientIdForDevice;
+          }
 
-        if (deviceUpdateError) throw deviceUpdateError;
-      } 
-      else {
-
-        const { error: deviceClearError } = await supabase
-          .from('devices')
-          .update({ locker_id: null }) 
-          .eq('locker_id', locker_id); 
-
-        if (deviceClearError) throw deviceClearError;
+          const { error: assignNewDeviceError } = await supabase
+            .from('devices')
+            .update(updatePayload)
+            .eq('id', selectedDeviceIdForSave);
+          if (assignNewDeviceError) throw assignNewDeviceError;
+        }
       }
 
       setLockerData(prev => ({
@@ -444,13 +444,12 @@ const LockerInformationDetails = () => {
         ...editedData,
         updated_at: new Date().toISOString(),
       }));
-      
+      setCurrentAssignedDeviceId(selectedDeviceIdForSave);
       setIsEditing(false);
       setSaveMessage({ type: 'success', text: 'Locker information updated successfully!' });
       
       loadLockerData(); 
-      loadDevices();
-      
+      loadDevices(); 
     } catch (err) {
       console.error('Error saving locker data:', err);
       setSaveMessage({ type: 'error', text: `Failed to save: ${err.message || 'Unknown error'}` });
@@ -463,9 +462,6 @@ const LockerInformationDetails = () => {
     loadDevices();
     setSaveMessage({ type: 'success', text: 'Device created successfully!' });
   };
-
-
-
 
   if (loading) {
     return (
@@ -489,6 +485,7 @@ const LockerInformationDetails = () => {
       </div>
     );
   }
+
   if (fetchError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-orange-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -522,6 +519,7 @@ const LockerInformationDetails = () => {
       </div>
     );
   }
+
   if (!lockerData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-orange-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -529,12 +527,13 @@ const LockerInformationDetails = () => {
           <div className="absolute top-40 right-20 w-72 h-72 bg-gray-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         </div>
         <div className="relative z-10 text-center space-y-6 max-w-md mx-auto">
-          <QuickStoreLogo size="w-16 h-16" />
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
             <AlertTriangle className="w-12 h-12 text-amber-500 mb-4 mx-auto" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">Locker Not Found</h3>
             <p className="text-gray-600 mb-6">
-              No locker data could be found for ID: <span className="font-semibold text-orange-600">{locker_id}</span>
+              No locker data could be found for ID: <span className="font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg">
+                {locker_id}
+              </span>
             </p>
             <Button 
               onClick={() => window.history.back()}
@@ -548,11 +547,10 @@ const LockerInformationDetails = () => {
       </div>
     );
   }
+
   return (
     <div className="min-h-screen  p-4 md:p-6 relative overflow-hidden">
-    
       <div className="relative z-10 max-w-5xl mx-auto space-y-6">
-        {/* Header */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -611,8 +609,7 @@ const LockerInformationDetails = () => {
             </div>
           </div>
         </div>
-        
-        {/* Save Message */}
+
         {saveMessage.text && (
           <div className={`p-4 rounded-2xl shadow-lg border ${saveMessage.type === 'success' ? 'bg-gradient-to-r from-green-50 to-green-100 text-green-800 border-green-200' : 'bg-gradient-to-r from-red-50 to-red-100 text-red-800 border-red-200'}`}>
             <div className="flex items-center">
@@ -626,9 +623,7 @@ const LockerInformationDetails = () => {
           </div>
         )}
 
-        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Basic Information */}
           <div className="lg:col-span-2">
             <Card className="bg-white/70 backdrop-blur-sm shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-t-2xl border-b border-white/30">
@@ -675,8 +670,6 @@ const LockerInformationDetails = () => {
                           <Palette className="w-4 h-4 text-orange-500" />
                           Door Color
                         </Label>
-
-                        {/* Color Picker Options */}
                         <div className="flex gap-2">
                           {[
                             { label: 'Orange', value: '#FF6B35' },
@@ -709,7 +702,6 @@ const LockerInformationDetails = () => {
                         />
                       </div>
                     </div>
-                    {/* Device Selection */}
                     <div className="pt-4 border-t border-gray-200 space-y-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -718,7 +710,7 @@ const LockerInformationDetails = () => {
                         </Label>
                         <div className="flex gap-2">
                           <select
-                            value={editedData.device_id}
+                            value={selectedDeviceIdForSave || ''}
                             onChange={(e) => handleDeviceChange(e.target.value)}
                             className="flex-1 p-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
                           >
@@ -788,7 +780,6 @@ const LockerInformationDetails = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Basic Details Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex items-start space-x-3">
                         <Package className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
@@ -840,7 +831,6 @@ const LockerInformationDetails = () => {
                         </div>
                       </div>
                     </div>
-                    {/* Device Information */}
                     {selectedDevice && (
                       <div className="pt-6 border-t border-gray-200">
                         <div className="flex items-center gap-2 mb-4">
@@ -877,7 +867,6 @@ const LockerInformationDetails = () => {
                         </div>
                       </div>
                     )}
-                    {/* Images Section */}
                     <div className="pt-6 border-t border-gray-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
@@ -955,9 +944,7 @@ const LockerInformationDetails = () => {
               </CardContent>
             </Card>
           </div>
-          {/* Status & Details Sidebar */}
           <div className="space-y-6">
-            {/* Status Card */}
             <Card className="bg-white/70 backdrop-blur-sm shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-t-2xl border-b border-white/30">
                 <CardTitle className="flex items-center gap-3 text-lg text-gray-800">
@@ -980,7 +967,7 @@ const LockerInformationDetails = () => {
                   </Button>
                   <Button 
                     className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white border-0 justify-start"
-                    onClick={() => {/* Add generate report logic */}}
+                    onClick={() => {}}
                   >
                     <Package className="w-4 h-4 mr-2" />
                     Generate Report
@@ -988,7 +975,7 @@ const LockerInformationDetails = () => {
                   <Button 
                     variant="outline"
                     className="w-full border-gray-300 hover:border-orange-500 text-gray-700 hover:text-orange-600 justify-start"
-                    onClick={() => {/* Add maintenance mode logic */}}
+                    onClick={() => {}}
                   >
                     <AlertTriangle className="w-4 h-4 mr-2" />
                     Set Maintenance
@@ -1004,7 +991,6 @@ const LockerInformationDetails = () => {
                 </div>
               </CardContent>
             </Card>
-            {/* System Info Card */}
             <Card className="bg-white/70 backdrop-blur-sm shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-t-2xl border-b border-white/30">
                 <CardTitle className="flex items-center gap-3 text-lg text-gray-800">
@@ -1043,7 +1029,6 @@ const LockerInformationDetails = () => {
                 </div>
               </CardContent>
             </Card>
-            {/* Status & Info Card */}
             <Card className="bg-white/70 backdrop-blur-sm shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
               <CardHeader className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-t-2xl border-b border-white/30">
                 <CardTitle className="flex items-center gap-3 text-lg text-gray-800">
@@ -1117,7 +1102,6 @@ const LockerInformationDetails = () => {
                 </div>
               </CardContent>
             </Card>
-            {/* Device Status Card */}
             {selectedDevice && (
               <Card className="bg-white/70 backdrop-blur-sm shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
                 <CardHeader className="bg-gradient-to-r from-orange-50 to-gray-50 rounded-t-2xl border-b border-white/30">
@@ -1154,7 +1138,6 @@ const LockerInformationDetails = () => {
           </div>
         </div>
       </div>
-      {/* Device Modal */}
       <DeviceModal
         isOpen={isDeviceModalOpen}
         onClose={() => setIsDeviceModalOpen(false)}
@@ -1165,4 +1148,5 @@ const LockerInformationDetails = () => {
     </div>
   );
 };
+
 export default LockerInformationDetails;

@@ -24,11 +24,10 @@ const AddLockerModal = ({ isOpen, onClose, onLockerAdded }) => {
   const [formData, setFormData] = useState({
     locker_number: '',
     client_id: '',
-    status: 'available', // Default, will likely change based on device assignment
-    device_id: '', // Will hold the actual device UUID
+    status: 'available',
+    device_id: '',
   });
   const [clients, setClients] = useState([]);
-  // Updated devices state to include locker assignment info
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
